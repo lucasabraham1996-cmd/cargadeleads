@@ -126,8 +126,16 @@
         // --- Configuración de Firebase ---
         async function setupFirebase() {
             try {
-                const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                // Configuración real de Firebase (reemplaza las variables inyectadas)
+                const firebaseConfig = {
+                  apiKey: "AIzaSyClcQiTJj91vzb0P5737owh4tUyJPLWgEA",
+                  authDomain: "cargadeleads.firebaseapp.com",
+                  projectId: "cargadeleads",
+                  storageBucket: "cargadeleads.firebasestorage.app", // Usamos el que nos diste
+                  messagingSenderId: "744616190679",
+                  appId: "1:744616190679:web:af63cbf7b42ee455a30692",
+                  measurementId: "G-Y40TM1HJ02"
+                };
                 
                 if (!firebaseConfig.apiKey) {
                     showMessage("La configuración de Firebase no está disponible. La persistencia de datos no funcionará.", true);
@@ -140,14 +148,13 @@
                 auth = getAuth(app);
                 setLogLevel('Debug');
 
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
+                // Como ya no estamos en el entorno de pruebas, usamos siempre la autenticación anónima
+                await signInAnonymously(auth);
                 
-                console.log("Usuario autenticado:", auth.currentUser?.uid);
-                const collectionPath = `/artifacts/${appId}/public/data/leads`;
+                console.log("Usuario autenticado (anónimo):", auth.currentUser?.uid);
+                
+                // Ruta simple para la base de datos de producción
+                const collectionPath = `leads`; 
                 leadsCollectionRef = collection(db, collectionPath);
                 listenToAllLeads();
             } catch (err) {
