@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Procesador de Leads v2.0</title>
+    <!-- Carga de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Carga de SheetJS (para exportar a Excel) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Carga de Firebase (para la base de datos) -->
+    <script type="module">
+        // Importar las funciones necesarias de Firebase
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, query, onSnapshot, setLogLevel, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Configuración de la Aplicación ---
+
+        // Mapa de Tecnicaturas (Nombre a ID)
+        const tecnicaturaMap = {
+            'Desarrollo web': 1,
+            'Administración de empresas': 2,
+            'Marketing': 3,
+            'Higiene y seguridad': 4,
+            'Gestión inmobiliaria': 5,
+            'Analista de sistemas': 6,
+            'Ciencia de datos e IA': 7,
+            'Recursos humanos': 8
+        };
+        // Invertir el mapa para buscar nombre por ID (útil para la tabla)
+        const tecnicaturaNameMap = Object.fromEntries(Object.entries(tecnicaturaMap).map(([key, value]) => [value, key]));
+
+        // Encabezados del Excel (como en tu imagen)
+        const excelHeaders = [
+            'ID',
+            'Nombre Completo',
+            'Email',
+            'Teléfono',
+            'Tecnicatura',
+            'Estado',
+            'Vendedor Asignado',
+            'Fecha de Creación',
+            'Último Contacto',
+            'Observaciones'
+        ];
+
+        // --- Variables de Estado y Elementos del DOM ---
+        let db;
+        let auth;
+        let leadsCollectionRef;
+        let currentLeads = []; // Aquí guardamos TODOS los leads
+        const procesarBtn = document.getElementById('procesarBtn');
+        const descargarBtn = document.getElementById('descargarBtn');
+        const limpiarBtn = document.getElementById('limpiarBtn');
+        const mensajeInput = document.getElementById('mensajeInput');
+        const leadsTableBody = document.getElementById('leadsTableBody');
+        const loader = document.getElementById('loader');
+        const errorBox = document.getElementById('errorBox');
+        const errorMessage = document.getElementById('errorMessage');
+        const confirmModal = document.getElementById('confirmModal');
+        const confirmLimpiarBtn = document.getElementById('confirmLimpiarBtn');
+        const cancelLimpiarBtn = document.getElementById('cancelLimpiarBtn');
+
+        // --- Configuración de Firebase ---
+
+        async function setupFirebase() {
+            try {
+                // Configuración de Firebase (inyectada por el entorno)
+                const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                
+                if (!firebaseConfig.apiKey) {
+                    showError("La configuración de Firebase no está disponible. La persistencia de datos no funcionará.");
+                    loader.classList.add('hidden');
+                    return;
+                }
+
+                // Inicializar Firebase
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                setLogLevel('Debug');
+
+                // Autenticar usuario
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                
+                console.log("Usuario autenticado:", auth.currentUser?.uid);
+
+                // Definir la ruta de la colección pública
+                const collectionPath = `/artifacts/${appId}/public/data/leads`;
+                leadsCollectionRef = collection(db, collectionPath);
+
+                // Empezar a escuchar TODOS los leads (ya no solo los de hoy)
+                listenToAllLeads();
+
+            } catch (err) {
+                console.error("Error inicializando Firebase:", err);
+                showError(`Error de Firebase: ${err.message}`);
+                loader.classList.add('hidden');
+            }
+        }
+
+        // --- Lógica de Firestore ---
+
+        function listenToAllLeads() {
+            // Ya no filtramos por fecha, traemos toda la colección
+            const q = query(leadsCollectionRef);
+
+            // Escuchar cambios en tiempo real
+            onSnapshot(q, (snapshot) => {
+                currentLeads = [];
+                snapshot.forEach((doc) => {
+                    currentLeads.push({ id: doc.id, ...doc.data() });
+                });
+                
+                // Ordenar por fecha de creación (más nuevos primero)
+                // Asumimos que fechaCreacion se guarda como string DD/MM/YYYY,
+                // así que necesitamos parsearlo para ordenar correctamente.
+                // O mejor, guardamos el timestamp y lo formateamos al mostrar.
+                // Voy a mantener el timestamp para ordenar y formatear al mostrar.
+                currentLeads.sort((a, b) => b.fechaCreacionTimestamp - a.fechaCreacionTimestamp);
+                
+                renderTable();
+                
+                // Habilitar/deshabilitar botones
+                const hasLeads = currentLeads.length > 0;
+                descargarBtn.disabled = !hasLeads;
+                descargarBtn.classList.toggle('opacity-50', !hasLeads);
+                limpiarBtn.disabled = !hasLeads;
+                limpiarBtn.classList.toggle('opacity-50', !hasLeads);
+
+            }, (err) => {
+                console.error("Error al escuchar leads:", err);
+                showError(`Error de Firestore: ${err.message}`);
+            });
+        }
+
+        async function saveLeadToFirestore(leadData) {
+            try {
+                // El 'id' se genera automáticamente, así que lo quitamos
+                const { id, ...dataToSave } = leadData;
+                const docRef = await addDoc(leadsCollectionRef, dataToSave);
+                console.log("Lead guardado con ID:", docRef.id);
+            } catch (err)
+                {
+                console.error("Error al guardar lead:", err);
+                showError(`Error al guardar en base de datos: ${err.message}`);
+            }
+        }
+
+        async function handleLimpiarClick() {
+            // Mostrar el modal de confirmación
+            confirmModal.classList.remove('hidden');
+        }
+
+        function hideConfirmModal() {
+            confirmModal.classList.add('hidden');
+        }
+
+        async function confirmLimpiarDatos() {
+            hideConfirmModal();
+            showLoader(true);
+            try {
+                // Obtener todos los documentos de la colección
+                const querySnapshot = await getDocs(leadsCollectionRef);
+                
+                // Crear un array de promesas de borrado
+                const deletePromises = [];
+                querySnapshot.forEach((docSnapshot) => {
+                    deletePromises.push(deleteDoc(doc(db, leadsCollectionRef.path, docSnapshot.id)));
+                });
+                
+                // Esperar a que todas las promesas de borrado se completen
+                await Promise.all(deletePromises);
+                
+                console.log("Todos los leads han sido eliminados.");
+                // La tabla se actualizará automáticamente gracias a onSnapshot
+                
+            } catch (err) {
+                console.error("Error al limpiar los datos:", err);
+                showError(`Error al limpiar la base de datos: ${err.message}`);
+            } finally {
+                showLoader(false);
+            }
+        }
+
+
+        // --- Lógica de la Interfaz (UI) ---
+
+        function renderTable() {
+            leadsTableBody.innerHTML = ''; // Limpiar tabla
+            if (currentLeads.length === 0) {
+                leadsTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="${excelHeaders.length}" class="text-center text-gray-500 p-4">
+                            No hay leads cargados.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            currentLeads.forEach(lead => {
+                const tr = document.createElement('tr');
+                tr.className = 'bg-white border-b hover:bg-gray-50';
+                tr.innerHTML = `
+                    <td class="p-3 text-xs text-gray-700 font-mono" title="${lead.id}">${lead.id.substring(0, 5)}...</td>
+                    <td class="p-3 text-sm text-gray-900">${lead.nombreCompleto}</td>
+                    <td class="p-3 text-sm text-gray-900">${lead.email}</td>
+                    <td class="p-3 text-sm text-gray-900">${lead.telefono}</td>
+                    <td class="p-3 text-sm text-gray-900">${tecnicaturaNameMap[lead.tecnicaturaId] || ''}</td>
+                    <td class="p-3"><span class="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">${lead.estado}</span></td>
+                    <td class="p-3 text-sm text-gray-900">${lead.vendedorAsignado}</td>
+                    <td class="p-3 text-sm text-gray-900">${lead.fechaCreacion}</td>
+                    <td class="p-3 text-sm text-gray-900">${lead.ultimoContacto}</td>
+                    <td class="p-3 text-sm text-gray-900">${lead.observaciones}</td>
+                `;
+                leadsTableBody.appendChild(tr);
+            });
+        }
+
+        function showLoader(show) {
+            loader.classList.toggle('hidden', !show);
+            procesarBtn.disabled = show;
+            procesarBtn.classList.toggle('opacity-50', show);
+            limpiarBtn.disabled = show;
+            limpiarBtn.classList.toggle('opacity-50', show);
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorBox.classList.remove('hidden');
+        }
+
+        function hideError() {
+            errorBox.classList.add('hidden');
+        }
+
+        // --- Lógica Principal de Procesamiento ---
+
+        async function handleProcesarClick() {
+            const mensaje = mensajeInput.value;
+            if (!mensaje.trim()) {
+                showError("El mensaje no puede estar vacío.");
+                return;
+            }
+
+            hideError();
+            showLoader(true);
+
+            try {
+                // 1. Llamar a Gemini para parsear el mensaje
+                const parsedData = await parseMessageWithGemini(mensaje);
+
+                if (!parsedData) {
+                    throw new Error("La IA no pudo procesar el mensaje. Intenta de nuevo.");
+                }
+
+                // 2. Mapear el nombre de la tecnicatura al ID
+                const tecnicaturaNombre = parsedData.tecnicatura || '';
+                const tecnicaturaId = tecnicaturaMap[tecnicaturaNombre] || ''; // Guardar ID o ''
+
+                // 3. Crear el objeto Lead completo con los nuevos requisitos
+                const timestamp = Date.now();
+                const fechaFormateada = new Date(timestamp).toLocaleDateString('es-AR', {
+                    day: '2-digit', month: '2-digit', year: 'numeric'
+                }); // Formato DD/MM/YYYY
+
+                const newLead = {
+                    id: '', // Se generará en Firestore
+                    nombreCompleto: parsedData.nombre || '',
+                    email: parsedData.email || '',
+                    telefono: parsedData.telefono || '',
+                    tecnicaturaId: tecnicaturaId, // <-- Este es el ID numérico o ''
+                    estado: 'sin_contacto', // <-- Requisito: siempre 'sin_contacto'
+                    vendedorAsignado: '', // <-- Requisito: vacío
+                    fechaCreacion: fechaFormateada, // <-- Requisito: solo fecha
+                    fechaCreacionTimestamp: timestamp, // <-- Para ordenar
+                    ultimoContacto: '', // <-- Requisito: vacío
+                    observaciones: '' // <-- Requisito: vacío
+                };
+
+                // 4. Guardar en Firestore
+                await saveLeadToFirestore(newLead);
+
+                // 5. Limpiar input
+                mensajeInput.value = '';
+
+            } catch (err) {
+                console.error("Error procesando mensaje:", err);
+                showError(err.message);
+            } finally {
+                showLoader(false);
+            }
+        }
+
+        // --- Llamada a la API de Gemini ---
+
+        async function parseMessageWithGemini(text) {
+            // Clave de API (inyectada por el entorno)
+            const apiKey = ""; // Dejar vacío, se gestiona automáticamente
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+            // Instrucción para el modelo (actualizada para devolver '' en lugar de 'N/A')
+            const systemPrompt = `
+                Eres un asistente de entrada de datos para una institución educativa.
+                Tu tarea es extraer la siguiente información de un mensaje de texto: nombre completo, email, teléfono y el nombre de la tecnicatura.
+                Debes identificar los datos y devolverlos en formato JSON.
+
+                Importante: Para el campo 'tecnicatura', debes mapear inteligentemente las entradas del usuario a uno de los siguientes nombres EXACTOS:
+                - 'Desarrollo web' (mapear desde 'web', 'desarrollo', 'programacion')
+                - 'Administración de empresas' (mapear desde 'adm. de empresas', 'administracion', 'adm de empresas')
+                - 'Marketing' (mapear desde 'mkt', 'marketing digital')
+                - 'Higiene y seguridad' (mapear desde 'higiene', 'seguridad e higiene', 'higiene y seguridad')
+                - 'Gestión inmobiliaria' (mapear desde 'inmobiliaria', 'gestion')
+                - 'Analista de sistemas' (mapear desde 'analista', 'sistemas')
+                - 'Ciencia de datos e IA' (mapear desde 'datos', 'ia', 'ciencia de datos')
+                - 'Recursos humanos' (mapear desde 'rrhh', 'recursos')
+
+                Si no puedes encontrar un dato (nombre, email, telefono), devuelve '' (una cadena vacía) para ese campo.
+                Si no puedes identificar una tecnicatura de la lista, devuelve '' (una cadena vacía).
+                El teléfono debe incluir el prefijo si está presente.
+            `;
+            
+            // Esquema de respuesta JSON
+            const jsonSchema = {
+                type: "OBJECT",
+                properties: {
+                    "nombre": { "type": "STRING" },
+                    "email": { "type": "STRING" },
+                    "telefono": { "type": "STRING" },
+                    "tecnicatura": { "type": "STRING" }
+                }
+            };
+
+            const payload = {
+                contents: [{ parts: [{ text: text }] }],
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: jsonSchema
+                }
+            };
+
+            // --- Lógica de reintento (Exponential Backoff) ---
+            let response;
+            let delay = 1000;
+            for (let i = 0; i < 3; i++) { // Reintentar hasta 3 veces
+                try {
+                    response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.status === 429 || response.status >= 500) {
+                        // Error de cuota o servidor, esperar y reintentar
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        delay *= 2;
+                        continue;
+                    }
+                    
+                    if (!response.ok) {
+                         const errorBody = await response.text();
+                         throw new Error(`Error de API: ${response.status} ${response.statusText}. Cuerpo: ${errorBody}`);
+                    }
+
+                    // Si la respuesta es OK, salir del bucle
+                    break;
+
+                } catch (err) {
+                    if (i === 2) throw err; // Lanzar error en el último reintento
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    delay *= 2;
+                }
+            }
+
+            // --- Procesar la respuesta exitosa ---
+            const result = await response.json();
+            
+            const candidate = result.candidates?.[0];
+            if (candidate && candidate.content?.parts?.[0]?.text) {
+                try {
+                    // El texto ya debería ser un JSON válido gracias a responseSchema
+                    const jsonText = candidate.content.parts[0].text;
+                    return JSON.parse(jsonText);
+                } catch (e) {
+                    console.error("Error al parsear JSON de la IA:", e);
+                    throw new Error("La IA devolvió un formato inesperado.");
+                }
+            } else {
+                console.error("Respuesta inesperada de la API:", result);
+                throw new Error("No se pudo obtener una respuesta válida de la IA.");
+            }
+        }
+
+        // --- Lógica de Exportación a Excel ---
+
+        function handleDescargarClick() {
+            if (currentLeads.length === 0) {
+                showError("No hay datos para descargar.");
+                return;
+            }
+
+            // 1. Mapear los datos al formato del Excel con los nuevos requisitos
+            const dataForExcel = currentLeads.map(lead => ({
+                'ID': '', // <-- Requisito: ID vacío
+                'Nombre Completo': lead.nombreCompleto,
+                'Email': lead.email,
+                'Teléfono': lead.telefono,
+                'Tecnicatura': lead.tecnicaturaId, // <--- El ID numérico o ''
+                'Estado': lead.estado,
+                'Vendedor Asignado': lead.vendedorAsignado,
+                'Fecha de Creación': lead.fechaCreacion, // <--- Solo la fecha
+                'Último Contacto': lead.ultimoContacto,
+                'Observaciones': lead.observaciones
+            }));
+
+            // 2. Crear la hoja de cálculo (Worksheet)
+            // Usamos 'header: excelHeaders' para asegurarnos de que el orden y los nombres
+            // de las columnas sean exactamente los que pidió el usuario.
+            
+            // --- INICIO DE LA CORRECCIÓN ---
+            // Usamos window.xlsx para acceder a la librería global desde el módulo
+            const ws = window.xlsx.utils.json_to_sheet(dataForExcel, { header: excelHeaders });
+
+            // 3. Crear el libro (Workbook)
+            const wb = window.xlsx.utils.book_new();
+            window.xlsx.utils.book_append_sheet(wb, ws, "Leads");
+
+            // 4. Descargar el archivo
+            const todayStr = new Date().toISOString().split('T')[0]; // 'YYYY-MM-DD'
+            window.xlsx.writeFile(wb, `leads_export_${todayStr}.xlsx`);
+            // --- FIN DE LA CORRECCIÓN ---
+        }
+
+        // --- Inicialización ---
+        document.addEventListener('DOMContentLoaded', () => {
+            procesarBtn.addEventListener('click', handleProcesarClick);
+            descargarBtn.addEventListener('click', handleDescargarClick);
+            limpiarBtn.addEventListener('click', handleLimpiarClick);
+            
+            // Controles del modal
+            confirmLimpiarBtn.addEventListener('click', confirmLimpiarDatos);
+            cancelLimpiarBtn.addEventListener('click', hideConfirmModal);
+            
+            document.getElementById('closeErrorBtn').addEventListener('click', hideError);
+            
+            // Iniciar Firebase y la escucha de datos
+            setupFirebase();
+        });
+
+    </script>
+</head>
+<body class="bg-gray-100 font-sans antialiased">
+
+    <!-- Modal de Confirmación -->
+    <div id="confirmModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div class="bg-white rounded-lg shadow-lg p-6 max-w-sm mx-auto">
+            <h3 class="text-lg font-medium text-gray-900">Confirmar Acción</h3>
+            <div class="mt-2">
+                <p class="text-sm text-gray-500">
+                    ¿Estás seguro de que deseas eliminar TODOS los leads de la base de datos? Esta acción no se puede deshacer.
+                </p>
+            </div>
+            <div class="mt-4 flex justify-end space-x-2">
+                <button id="cancelLimpiarBtn" type="button" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">
+                    Cancelar
+                </button>
+                <button id="confirmLimpiarBtn" type="button" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">
+                    Eliminar Todo
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <div class="container mx-auto p-4 md:p-8 max-w-7xl">
+        
+        <!-- Cabecera -->
+        <header class="mb-6 flex justify-between items-center">
+            <h1 class="text-3xl font-bold text-gray-800">Procesador de Leads</h1>
+            <div id="loader" class="hidden">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            </div>
+        </header>
+
+        <!-- Sección de Alerta/Error -->
+        <div id="errorBox" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4" role="alert">
+            <strong class="font-bold">Error: </strong>
+            <span id="errorMessage" class="block sm:inline"></span>
+            <span id="closeErrorBtn" class="absolute top-0 bottom-0 right-0 px-4 py-3 cursor-pointer">
+                <svg class="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><title>Cerrar</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
+            </span>
+        </div>
+
+        <!-- Panel de Entrada -->
+        <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4">Pegar mensaje de WhatsApp</h2>
+            <textarea id="mensajeInput"
+                class="w-full h-40 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Pega aquí el mensaje completo... 
+Ej: 'Hola, mi nombre es Juan Pérez, mi email es juan@correo.com y mi tel 11-1234-5678. Estoy interesado en la tecnicatura de higiene.'"></textarea>
+            
+            <div class="mt-4 flex flex-col sm:flex-row gap-4">
+                <button id="procesarBtn"
+                    class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow transition duration-300 ease-in-out">
+                    Procesar y Agregar Lead
+                </button>
+                <button id="descargarBtn"
+                    class="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg shadow transition duration-300 ease-in-out disabled:opacity-50"
+                    disabled>
+                    Descargar Excel
+                </button>
+                <button id="limpiarBtn"
+                    class="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg shadow transition duration-300 ease-in-out disabled:opacity-50"
+                    disabled>
+                    Limpiar Datos
+                </button>
+            </div>
+        </div>
+
+        <!-- Tabla de Leads -->
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <h2 class="text-xl font-semibold text-gray-700 p-6">Historial de Leads</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full min-w-max text-left text-sm text-gray-500">
+                    <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                        <tr>
+                            <!-- Generamos los encabezados desde el array -->
+                            <script>
+                                const headers = [
+                                    'ID', 'Nombre', 'Email', 'Teléfono', 'Tecnicatura', 'Estado',
+                                    'Vendedor', 'Creación', 'Contacto', 'Obs.'
+                                ];
+                                // Usamos los encabezados cortos para la tabla, el Excel usará los largos
+                                headers.forEach(h => document.write(`<th scope="col" class="p-3">${h}</th>`));
+                            </script>
+                        </tr>
+                    </thead>
+                    <tbody id="leadsTableBody">
+                        <!-- Las filas se insertarán aquí dinámicamente -->
+                        <tr>
+                            <td colspan="10" class="text-center text-gray-500 p-4">
+                                Cargando datos...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+</body>
+</html>
+
