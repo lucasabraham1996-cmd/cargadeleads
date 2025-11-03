@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Procesador de Leads v5.0</title>
+    <title>Procesador de Leads v5.1</title>
     <!-- Carga de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Carga de SheetJS (para exportar a Excel) -->
@@ -12,11 +12,16 @@
     <script type="module">
         // Importar las funciones necesarias de Firebase
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, onSnapshot, setLogLevel, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Configuración de la Aplicación ---
-
+        
+        // **************************************************************************
+        // *** Tu clave de API de Gemini ya está integrada aquí. ***
+        // **************************************************************************
+        const GEMINI_API_KEY = "AIzaSyClcQiTJj91vzb0P5737owh4tUyJPLWgEA"; 
+        
         // Mapa de Tecnicaturas (Nombre a ID)
         const tecnicaturaMap = {
             'Desarrollo web': 1,
@@ -582,8 +587,8 @@
          * Llama a Gemini para extraer datos de un TEXTO.
          */
         async function parseMessageWithGemini(text) {
-            const apiKey = "";
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            // Usamos la clave de API global definida al inicio
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`;
 
             const payload = {
                 contents: [{ parts: [{ text: text }] }],
@@ -600,8 +605,8 @@
          * Llama a Gemini para extraer datos de una IMAGEN.
          */
         async function parseImageWithGemini(base64Data, mimeType) {
-            const apiKey = "";
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            // Usamos la clave de API global definida al inicio
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`;
 
             const payload = {
                 contents: [
@@ -651,6 +656,11 @@
                     delay *= 2;
                 }
             }
+            
+            // Si después de 3 intentos no hay respuesta, 'response' será undefined
+            if (!response) {
+                throw new Error("No se pudo obtener respuesta de la API después de 3 intentos.");
+            }
 
             const result = await response.json();
             const candidate = result.candidates?.[0];
@@ -664,6 +674,9 @@
                 }
             } else {
                 console.error("Respuesta inesperada de la API:", result);
+                if(result.error) {
+                    throw new Error(`Error de la API de Google: ${result.error.message}`);
+                }
                 throw new Error("No se pudo obtener una respuesta válida de la IA.");
             }
         }
