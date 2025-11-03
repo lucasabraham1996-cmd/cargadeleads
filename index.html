@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Procesador de Leads v4.0</title>
+    <title>Procesador de Leads v5.0</title>
     <!-- Carga de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Carga de SheetJS (para exportar a Excel) -->
@@ -281,9 +281,7 @@
         // --- Lógica Central de Procesamiento ---
 
         /**
-         * (REFACTORIZADO) Toma datos ya parseados, los formatea y los guarda en Firestore.
-         * @param {object} parsedData El objeto {nombre, email, telefono, tecnicatura}
-         * @returns {Promise<boolean>} true si tuvo éxito.
+         * Toma datos ya parseados, los formatea y los guarda en Firestore.
          */
         async function processAndSaveLead(parsedData) {
             if (!parsedData) {
@@ -344,13 +342,38 @@
             showLoader(false);
         }
 
-        // --- Lógica de Carga de Imagen (NUEVO) ---
+        // --- Lógica de Carga de Imagen (REFACTORIZADA) ---
 
         /**
-         * Maneja la selección de un archivo de imagen.
+         * Maneja la selección de un archivo de imagen (desde el input 'file').
          */
         function handleImageUpload(event) {
             const file = event.target.files[0];
+            if (!file) return;
+            processImageFile(file); // Llamar a la función reutilizable
+            event.target.value = null; // Resetear input
+        }
+
+        /**
+         * Maneja el pegado de una imagen (desde el portapapeles).
+         */
+        function handlePaste(event) {
+            const items = (event.clipboardData || window.clipboardData).items;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].kind === 'file' && items[i].type.startsWith('image/')) {
+                    event.preventDefault(); // Detener el pegado de texto (ej. "[imagen]")
+                    const file = items[i].getAsFile();
+                    processImageFile(file); // Llamar a la función reutilizable
+                    return; // Encontramos una imagen, salimos
+                }
+            }
+            // Si no hay imagen, permite el pegado de texto normal
+        }
+
+        /**
+         * (NUEVA FUNCIÓN REUTILIZABLE) Procesa un objeto File de imagen.
+         */
+        async function processImageFile(file) {
             if (!file) return;
 
             hideMessage();
@@ -376,18 +399,16 @@
                     showMessage(`Error al procesar imagen: ${err.message}`, true);
                 } finally {
                     showLoader(false);
-                    event.target.value = null; // Resetear input
                 }
             };
             reader.onerror = () => {
                 showMessage("Error al leer el archivo de imagen.", true);
                 showLoader(false);
-                event.target.value = null;
             };
             reader.readAsDataURL(file);
         }
 
-        // --- Lógica de Carga de Excel (MODIFICADO) ---
+        // --- Lógica de Carga de Excel (Sin cambios) ---
 
         /**
          * Maneja la selección de un archivo Excel.
@@ -548,7 +569,7 @@
         }
 
 
-        // --- Llamadas a la API de Gemini ---
+        // --- Llamadas a la API de Gemini (Sin cambios) ---
 
         /**
          * Llama a Gemini para extraer datos de un TEXTO.
@@ -681,6 +702,10 @@
             // Inputs de archivo
             excelInput.addEventListener('change', handleExcelUpload);
             imagenInput.addEventListener('change', handleImageUpload);
+            
+            // *** NUEVO LISTENER ***
+            // Escuchar el evento 'paste' en el textarea
+            mensajeInput.addEventListener('paste', handlePaste);
 
             // Controles del modal de limpieza
             confirmLimpiarBtn.addEventListener('click', confirmLimpiarDatos);
@@ -754,10 +779,10 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
             <!-- Columna Izquierda: Texto y Acciones -->
             <div class="bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-xl font-semibold text-gray-700 mb-4">Opción 1: Pegar texto</h2>
+                <h2 class="text-xl font-semibold text-gray-700 mb-4">Opción 1: Pegar (Texto o Imagen)</h2>
                 <textarea id="mensajeInput"
                     class="w-full h-32 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Pega aquí el mensaje completo..."></textarea>
+                    placeholder="Pega aquí el mensaje de texto O una captura de pantalla (imagen)..."></textarea>
                 <button id="procesarBtn"
                     class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow transition duration-300 ease-in-out">
                     Procesar Texto
