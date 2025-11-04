@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Procesador de Leads v5.1</title>
+    <title>Procesador de Leads v5.2</title>
     <!-- Carga de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Carga de SheetJS (para exportar a Excel) -->
@@ -581,7 +581,7 @@
         }
 
 
-        // --- Llamadas a la API de Gemini (Sin cambios) ---
+        // --- Llamadas a la API de Gemini ---
 
         /**
          * Llama a Gemini para extraer datos de un TEXTO.
@@ -608,12 +608,19 @@
             // Usamos la clave de API global definida al inicio
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`;
 
+            // *** CAMBIO ***: Instrucción de usuario actualizada para buscar el teléfono arriba.
+            const userPromptForImage = `
+                Extrae el nombre, email, teléfono y la tecnicatura de esta imagen, que es una captura de pantalla de una conversación.
+                Importante: Primero, busca un número de teléfono en la parte SUPERIOR de la captura (el contacto de WhatsApp). 
+                Si lo encuentras, úsalo como el 'telefono'. Si no, busca el teléfono en el texto de la conversación.
+            `;
+
             const payload = {
                 contents: [
                     { 
                         role: "user", 
                         parts: [
-                            { text: "Extrae el nombre, email, teléfono y la tecnicatura de esta imagen, que es una captura de pantalla de una conversación." },
+                            { text: userPromptForImage }, // Usamos el prompt actualizado
                             { inlineData: { mimeType: mimeType, data: base64Data } }
                         ]
                     }
@@ -689,6 +696,14 @@
                 showMessage("No hay datos para descargar.", true);
                 return;
             }
+
+            // *** CAMBIO ***: Verificar si la librería XLSX está cargada.
+            if (typeof window.xlsx === 'undefined') {
+                showMessage("La librería de Excel (xlsx) no se ha cargado. Revisa tu conexión o recarga la página.", true);
+                console.error("Error: La librería window.xlsx no está definida.");
+                return;
+            }
+
             const dataForExcel = currentLeads.map(lead => ({
                 'ID': '',
                 'Nombre Completo': lead.nombreCompleto,
