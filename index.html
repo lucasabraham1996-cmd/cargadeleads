@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Procesador de Leads v5.5</title>
+    <title>Procesador de Leads v5.6</title>
     <!-- Carga de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -668,31 +668,39 @@
             }
         }
 
-        // --- *** NUEVA *** Función Helper para Email de Excel ---
+        // --- *** CAMBIO *** Función Helper para Email de Excel ---
         /**
-         * Genera un email ficticio a partir de un nombre.
+         * Genera un email ficticio a partir de un nombre o un ID único.
          */
-        function generateDummyEmail(name) {
-            if (!name) return 'sin.email@cervantes.edu.ar';
-            try {
-                const cleanName = name
-                    .toLowerCase()
-                    .normalize("NFD") // Separa acentos (ej. "é" -> "e" + "´")
-                    .replace(/[\u0300-\u036f]/g, "") // Elimina los acentos
-                    .replace(/[^a-z0-9\s]/g, '') // Elimina caracteres no alfanuméricos (excepto espacios)
-                    .trim()
-                    .replace(/\s+/g, '.'); // Reemplaza espacios con puntos
-                
-                // Evita que quede solo un punto si el nombre era inválido
-                if (cleanName === "" || cleanName === ".") {
-                    return 'sin.email@cervantes.edu.ar';
+        function generateDummyEmail(lead) {
+            const name = lead.nombreCompleto;
+            // Primero, intentar generar desde el nombre
+            if (name) {
+                try {
+                    const cleanName = name
+                        .toLowerCase()
+                        .normalize("NFD") // Separa acentos (ej. "é" -> "e" + "´")
+                        .replace(/[\u0300-\u036f]/g, "") // Elimina los acentos
+                        .replace(/[^a-z0-9\s]/g, '') // Elimina caracteres no alfanuméricos (excepto espacios)
+                        .trim()
+                        .replace(/\s+/g, '.'); // Reemplaza espacios con puntos
+                    
+                    // Si el nombre procesado es inválido (ej. solo símbolos), usar el timestamp
+                    if (cleanName === "" || cleanName === ".") {
+                         // Usar el timestamp como código numérico único
+                        return `${lead.fechaCreacionTimestamp}@cervantes.edu.ar`;
+                    }
+                    
+                    return `${cleanName}@cervantes.edu.ar`;
+                } catch (err) {
+                    console.error("Error generando email ficticio desde nombre, usando timestamp:", err);
+                    // Fallback al timestamp en caso de error
+                    return `${lead.fechaCreacionTimestamp}@cervantes.edu.ar`;
                 }
-                
-                return `${cleanName}@cervantes.edu.ar`;
-            } catch (err) {
-                console.error("Error generando email ficticio:", err);
-                return 'error.email@cervantes.edu.ar';
             }
+            
+            // Si no hay nombre, usar el timestamp como código numérico único
+            return `${lead.fechaCreacionTimestamp}@cervantes.edu.ar`;
         }
 
 
@@ -710,9 +718,10 @@
                 return;
             }
 
-            // *** CAMBIO ***: Generar email ficticio si está vacío
+            // *** CAMBIO ***: Generar email ficticio si está vacío, pasando el objeto lead
             const dataForExcel = currentLeads.map(lead => {
-                const email = lead.email || generateDummyEmail(lead.nombreCompleto);
+                // Si lead.email no existe, llama a generateDummyEmail pasándole el objeto 'lead' completo
+                const email = lead.email || generateDummyEmail(lead); 
                 
                 return {
                     'ID': '',
