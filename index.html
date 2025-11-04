@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Procesador de Leads v5.6</title>
+    <title>Procesador de Leads v5.7</title>
     <!-- Carga de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -94,8 +94,8 @@
         let leadsCollectionRef;
         let currentLeads = []; // Todos los leads de Firestore
         let excelPreviewData = []; // Leads del Excel antes de confirmar
-        let leadIdToDelete = null; // *** NUEVO ***: ID del lead a eliminar
-
+        let leadIdToDelete = null; 
+        
         // Elementos del DOM
         const loader = document.getElementById('loader');
         const messageBox = document.getElementById('messageBox');
@@ -120,7 +120,7 @@
         const confirmLimpiarBtn = document.getElementById('confirmLimpiarBtn');
         const cancelLimpiarBtn = document.getElementById('cancelLimpiarBtn');
         
-        // *** NUEVO ***: Modal de Eliminación Individual
+        // Modal de Eliminación Individual
         const confirmDeleteOneModal = document.getElementById('confirmDeleteOneModal');
         const confirmDeleteOneBtn = document.getElementById('confirmDeleteOneBtn');
         const cancelDeleteOneBtn = document.getElementById('cancelDeleteOneBtn');
@@ -174,6 +174,7 @@
         // --- Lógica de Firestore ---
 
         function listenToAllLeads() {
+            if (!leadsCollectionRef) return; // Guard contra inicialización tardía
             const q = query(leadsCollectionRef);
             onSnapshot(q, (snapshot) => {
                 currentLeads = [];
@@ -219,7 +220,7 @@
             try {
                 const querySnapshot = await getDocs(leadsCollectionRef);
                 const deletePromises = querySnapshot.docs.map(docSnapshot => 
-                    deleteDoc(doc(db, leadsCollectionRef.path, docSnapshot.id))
+                    deleteDoc(doc(leadsCollectionRef, docSnapshot.id)) // Usar referencia de colección
                 );
                 await Promise.all(deletePromises);
                 showMessage("Todos los leads han sido eliminados.", false);
@@ -231,7 +232,7 @@
             }
         }
         
-        // --- *** NUEVA *** Lógica de Eliminación Individual ---
+        // --- Lógica de Eliminación Individual ---
 
         function handleDeleteClick(event) {
             const deleteButton = event.target.closest('.delete-btn');
@@ -249,11 +250,18 @@
         }
 
         async function confirmDeleteOneLead() {
-            if (!leadIdToDelete) return;
+            if (!leadIdToDelete || !leadsCollectionRef) {
+                showMessage("Error: No se pudo encontrar la referencia del lead.", true);
+                return;
+            }
             hideDeleteOneModal();
             showLoader(true);
             try {
-                await deleteDoc(doc(db, leadsCollectionRef.path, leadIdToDelete));
+                // *** CORRECCIÓN ***: 
+                // Se cambió doc(db, leadsCollectionRef.path, leadIdToDelete) 
+                // por doc(leadsCollectionRef, leadIdToDelete)
+                // Esta es la forma más robusta y correcta de referenciar un subdocumento.
+                await deleteDoc(doc(leadsCollectionRef, leadIdToDelete));
                 showMessage("Lead eliminado correctamente.", false);
             } catch (err) {
                 console.error("Error al eliminar el lead:", err);
@@ -269,7 +277,6 @@
 
         function renderTable() {
             leadsTableBody.innerHTML = '';
-            // *** CAMBIO ***: Añadida la columna "Acciones" (11 en total)
             const totalColumns = excelHeaders.length + 1;
             
             if (currentLeads.length === 0) {
@@ -281,7 +288,6 @@
                 const tr = document.createElement('tr');
                 tr.className = 'bg-white border-b hover:bg-gray-50';
                 
-                // *** CAMBIO ***: Se añade la celda de acciones con el botón de eliminar
                 tr.innerHTML = `
                     <td class="p-3 text-xs text-gray-700 font-mono" title="${lead.id}">${lead.id.substring(0, 5)}...</td>
                     <td class="p-3 text-sm text-gray-900">${lead.nombreCompleto}</td>
@@ -471,6 +477,7 @@
                     if (jsonRows.length === 0) throw new Error("El Excel está vacío.");
                     for (const [index, row] of jsonRows.entries()) {
                         const textRow = Object.entries(row).map(([key, value]) => `${key}: ${value}`).join(', ');
+                        // La IA detecta la carrera aquí
                         const parsedData = await parseMessageWithGemini(textRow);
                         excelPreviewData.push({ 
                             tempId: index,
@@ -541,6 +548,7 @@
                     </td>
                 `;
                 const select = tr.querySelector('select');
+                // Aquí se setea la carrera detectada. Si es '', te deja elegir.
                 select.value = row.tecnicatura || '';
                 tr.querySelectorAll('input, select').forEach(el => {
                     el.addEventListener('change', (e) => updatePreviewData(e.target.dataset.id, e.target.dataset.field, e.target.value));
@@ -668,38 +676,29 @@
             }
         }
 
-        // --- *** CAMBIO *** Función Helper para Email de Excel ---
-        /**
-         * Genera un email ficticio a partir de un nombre o un ID único.
-         */
+        // --- Función Helper para Email de Excel ---
         function generateDummyEmail(lead) {
             const name = lead.nombreCompleto;
-            // Primero, intentar generar desde el nombre
             if (name) {
                 try {
                     const cleanName = name
                         .toLowerCase()
-                        .normalize("NFD") // Separa acentos (ej. "é" -> "e" + "´")
-                        .replace(/[\u0300-\u036f]/g, "") // Elimina los acentos
-                        .replace(/[^a-z0-9\s]/g, '') // Elimina caracteres no alfanuméricos (excepto espacios)
+                        .normalize("NFD") 
+                        .replace(/[\u0300-\u036f]/g, "") 
+                        .replace(/[^a-z0-9\s]/g, '') 
                         .trim()
-                        .replace(/\s+/g, '.'); // Reemplaza espacios con puntos
+                        .replace(/\s+/g, '.'); 
                     
-                    // Si el nombre procesado es inválido (ej. solo símbolos), usar el timestamp
                     if (cleanName === "" || cleanName === ".") {
-                         // Usar el timestamp como código numérico único
                         return `${lead.fechaCreacionTimestamp}@cervantes.edu.ar`;
                     }
                     
                     return `${cleanName}@cervantes.edu.ar`;
                 } catch (err) {
                     console.error("Error generando email ficticio desde nombre, usando timestamp:", err);
-                    // Fallback al timestamp en caso de error
                     return `${lead.fechaCreacionTimestamp}@cervantes.edu.ar`;
                 }
             }
-            
-            // Si no hay nombre, usar el timestamp como código numérico único
             return `${lead.fechaCreacionTimestamp}@cervantes.edu.ar`;
         }
 
@@ -718,9 +717,7 @@
                 return;
             }
 
-            // *** CAMBIO ***: Generar email ficticio si está vacío, pasando el objeto lead
             const dataForExcel = currentLeads.map(lead => {
-                // Si lead.email no existe, llama a generateDummyEmail pasándole el objeto 'lead' completo
                 const email = lead.email || generateDummyEmail(lead); 
                 
                 return {
@@ -766,11 +763,11 @@
             confirmLimpiarBtn.addEventListener('click', confirmLimpiarDatos);
             cancelLimpiarBtn.addEventListener('click', hideConfirmModal);
             
-            // *** NUEVO ***: Controles del modal de eliminación individual
+            // Controles del modal de eliminación individual
             confirmDeleteOneBtn.addEventListener('click', confirmDeleteOneLead);
             cancelDeleteOneBtn.addEventListener('click', hideDeleteOneModal);
             
-            // *** NUEVO ***: Listener de clic en la tabla para delegación de eventos
+            // Listener de clic en la tabla para delegación de eventos
             leadsTableBody.addEventListener('click', handleDeleteClick);
             
             // Controles del modal de vista previa de Excel
@@ -902,7 +899,6 @@
                     <thead class="text-xs text-gray-700 uppercase bg-gray-50">
                         <tr>
                             <script>
-                                // *** CAMBIO ***: Añadida la columna "Acciones"
                                 const headers = [
                                     'ID', 'Nombre', 'Email', 'Teléfono', 'Tecnicatura', 'Estado',
                                     'Vendedor', 'Creación', 'Contacto', 'Obs.', 'Acciones'
