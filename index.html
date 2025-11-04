@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Procesador de Leads v5.4</title>
+    <title>Procesador de Leads v5.5</title>
     <!-- Carga de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Se cambió el CDN de SheetJS a jsdelivr por si cloudflare está bloqueado -->
+    <!-- Se cambió el CDN de SheetJS a jsdelivr -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     
     <!-- Carga de Firebase (para la base de datos) -->
@@ -19,9 +19,6 @@
 
         // --- Configuración de la Aplicación ---
         
-        // **************************************************************************
-        // *** Tu clave de API de Gemini ya está integrada aquí. ***
-        // **************************************************************************
         const GEMINI_API_KEY = "AIzaSyClcQiTJj91vzb0P5737owh4tUyJPLWgEA"; 
         
         // Mapa de Tecnicaturas (Nombre a ID)
@@ -35,7 +32,6 @@
             'Ciencia de datos e IA': 7,
             'Recursos humanos': 8
         };
-        // Invertir el mapa para buscar nombre por ID (útil para la tabla)
         const tecnicaturaNameMap = Object.fromEntries(Object.entries(tecnicaturaMap).map(([key, value]) => [value, key]));
 
         // Encabezados del Excel (como en tu imagen)
@@ -98,6 +94,7 @@
         let leadsCollectionRef;
         let currentLeads = []; // Todos los leads de Firestore
         let excelPreviewData = []; // Leads del Excel antes de confirmar
+        let leadIdToDelete = null; // *** NUEVO ***: ID del lead a eliminar
 
         // Elementos del DOM
         const loader = document.getElementById('loader');
@@ -118,10 +115,16 @@
         const excelInput = document.getElementById('excelInput');
         const imagenInput = document.getElementById('imagenInput');
 
-        // Modal de Limpieza
+        // Modal de Limpieza General
         const confirmModal = document.getElementById('confirmModal');
         const confirmLimpiarBtn = document.getElementById('confirmLimpiarBtn');
         const cancelLimpiarBtn = document.getElementById('cancelLimpiarBtn');
+        
+        // *** NUEVO ***: Modal de Eliminación Individual
+        const confirmDeleteOneModal = document.getElementById('confirmDeleteOneModal');
+        const confirmDeleteOneBtn = document.getElementById('confirmDeleteOneBtn');
+        const cancelDeleteOneBtn = document.getElementById('cancelDeleteOneBtn');
+        const deleteLeadName = document.getElementById('deleteLeadName');
         
         // Modal de Vista Previa de Excel
         const excelPreviewModal = document.getElementById('excelPreviewModal');
@@ -133,12 +136,12 @@
         // --- Configuración de Firebase ---
         async function setupFirebase() {
             try {
-                // Configuración real de Firebase (reemplaza las variables inyectadas)
+                // Configuración real de Firebase
                 const firebaseConfig = {
                   apiKey: "AIzaSyClcQiTJj91vzb0P5737owh4tUyJPLWgEA",
                   authDomain: "cargadeleads.firebaseapp.com",
                   projectId: "cargadeleads",
-                  storageBucket: "cargadeleads.firebasestorage.app", // Usamos el que nos diste
+                  storageBucket: "cargadeleads.firebasestorage.app", 
                   messagingSenderId: "744616190679",
                   appId: "1:744616190679:web:af63cbf7b42ee455a30692",
                   measurementId: "G-Y40TM1HJ02"
@@ -155,12 +158,9 @@
                 auth = getAuth(app);
                 setLogLevel('Debug');
 
-                // Como ya no estamos en el entorno de pruebas, usamos siempre la autenticación anónima
                 await signInAnonymously(auth);
-                
                 console.log("Usuario autenticado (anónimo):", auth.currentUser?.uid);
                 
-                // Ruta simple para la base de datos de producción
                 const collectionPath = `leads`; 
                 leadsCollectionRef = collection(db, collectionPath);
                 listenToAllLeads();
@@ -197,7 +197,6 @@
             try {
                 const { id, ...dataToSave } = leadData;
                 await addDoc(leadsCollectionRef, dataToSave);
-                // No logueamos aquí para evitar spam, la tabla se actualiza sola
             } catch (err) {
                 console.error("Error al guardar lead:", err);
                 showMessage(`Error al guardar en base de datos: ${err.message}`, true);
@@ -231,18 +230,58 @@
                 showLoader(false);
             }
         }
+        
+        // --- *** NUEVA *** Lógica de Eliminación Individual ---
+
+        function handleDeleteClick(event) {
+            const deleteButton = event.target.closest('.delete-btn');
+            if (deleteButton) {
+                leadIdToDelete = deleteButton.dataset.id;
+                const leadName = deleteButton.dataset.name || "este lead";
+                deleteLeadName.textContent = leadName;
+                confirmDeleteOneModal.classList.remove('hidden');
+            }
+        }
+
+        function hideDeleteOneModal() {
+            confirmDeleteOneModal.classList.add('hidden');
+            leadIdToDelete = null;
+        }
+
+        async function confirmDeleteOneLead() {
+            if (!leadIdToDelete) return;
+            hideDeleteOneModal();
+            showLoader(true);
+            try {
+                await deleteDoc(doc(db, leadsCollectionRef.path, leadIdToDelete));
+                showMessage("Lead eliminado correctamente.", false);
+            } catch (err) {
+                console.error("Error al eliminar el lead:", err);
+                showMessage(`Error al eliminar el lead: ${err.message}`, true);
+            } finally {
+                leadIdToDelete = null;
+                showLoader(false);
+            }
+        }
+
 
         // --- Lógica de la Interfaz (UI) ---
 
         function renderTable() {
             leadsTableBody.innerHTML = '';
+            // *** CAMBIO ***: Añadida la columna "Acciones" (11 en total)
+            const totalColumns = excelHeaders.length + 1;
+            
             if (currentLeads.length === 0) {
-                leadsTableBody.innerHTML = `<tr><td colspan="${excelHeaders.length}" class="text-center text-gray-500 p-4">No hay leads cargados.</td></tr>`;
+                leadsTableBody.innerHTML = `<tr><td colspan="${totalColumns}" class="text-center text-gray-500 p-4">No hay leads cargados.</td></tr>`;
                 return;
             }
+            
             currentLeads.forEach(lead => {
                 const tr = document.createElement('tr');
                 tr.className = 'bg-white border-b hover:bg-gray-50';
+                
+                // *** CAMBIO ***: Se añade la celda de acciones con el botón de eliminar
                 tr.innerHTML = `
                     <td class="p-3 text-xs text-gray-700 font-mono" title="${lead.id}">${lead.id.substring(0, 5)}...</td>
                     <td class="p-3 text-sm text-gray-900">${lead.nombreCompleto}</td>
@@ -254,6 +293,14 @@
                     <td class="p-3 text-sm text-gray-900">${lead.fechaCreacion}</td>
                     <td class="p-3 text-sm text-gray-900">${lead.ultimoContacto}</td>
                     <td class="p-3 text-sm text-gray-900">${lead.observaciones}</td>
+                    <td class="p-3 text-center">
+                        <button type="button" class="delete-btn text-red-500 hover:text-red-700" 
+                                data-id="${lead.id}" data-name="${lead.nombreCompleto}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </button>
+                    </td>
                 `;
                 leadsTableBody.appendChild(tr);
             });
@@ -268,7 +315,6 @@
                     btn.classList.toggle('opacity-50', show);
                 }
             });
-            // Re-habilitar botones de descarga/limpieza si hay leads
             if (!show && currentLeads.length > 0) {
                 descargarBtn.disabled = false;
                 descargarBtn.classList.remove('opacity-50');
@@ -294,9 +340,6 @@
 
         // --- Lógica Central de Procesamiento ---
 
-        /**
-         * Toma datos ya parseados, los formatea y los guarda en Firestore.
-         */
         async function processAndSaveLead(parsedData) {
             if (!parsedData) {
                 return false;
@@ -356,53 +399,39 @@
             showLoader(false);
         }
 
-        // --- Lógica de Carga de Imagen (REFACTORIZADA) ---
+        // --- Lógica de Carga de Imagen ---
 
-        /**
-         * Maneja la selección de un archivo de imagen (desde el input 'file').
-         */
         function handleImageUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
-            processImageFile(file); // Llamar a la función reutilizable
-            event.target.value = null; // Resetear input
+            processImageFile(file);
+            event.target.value = null; 
         }
 
-        /**
-         * Maneja el pegado de una imagen (desde el portapapeles).
-         */
         function handlePaste(event) {
             const items = (event.clipboardData || window.clipboardData).items;
             for (let i = 0; i < items.length; i++) {
                 if (items[i].kind === 'file' && items[i].type.startsWith('image/')) {
-                    event.preventDefault(); // Detener el pegado de texto (ej. "[imagen]")
+                    event.preventDefault(); 
                     const file = items[i].getAsFile();
-                    processImageFile(file); // Llamar a la función reutilizable
-                    return; // Encontramos una imagen, salimos
+                    processImageFile(file); 
+                    return; 
                 }
             }
-            // Si no hay imagen, permite el pegado de texto normal
         }
 
-        /**
-         * (NUEVA FUNCIÓN REUTILIZABLE) Procesa un objeto File de imagen.
-         */
         async function processImageFile(file) {
             if (!file) return;
-
             hideMessage();
             showLoader(true);
             showMessage("Procesando imagen (OCR)... esto puede tardar.", false);
-
             const reader = new FileReader();
             reader.onload = async (e) => {
                 try {
                     const base64DataUrl = e.target.result;
                     const base64Data = base64DataUrl.split(',')[1];
-                    
                     const parsedData = await parseImageWithGemini(base64Data, file.type);
                     const success = await processAndSaveLead(parsedData);
-
                     if (success) {
                         showMessage("Lead extraído de la imagen y agregado.", false);
                     } else {
@@ -424,45 +453,33 @@
 
         // --- Lógica de Carga de Excel ---
 
-        /**
-         * Maneja la selección de un archivo Excel.
-         */
         function handleExcelUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
-
             hideMessage();
             showLoader(true);
             showMessage("Procesando archivo Excel para vista previa...", false);
-            
-            excelPreviewData = []; // Limpiar vista previa anterior
-
+            excelPreviewData = []; 
             const reader = new FileReader();
             reader.onload = async (e) => {
                 try {
                     const data = e.target.result;
-                    // *** CORRECCIÓN ***: Usar window.XLSX (mayúsculas)
                     const workbook = window.XLSX.read(data, { type: 'array' });
                     const sheetName = workbook.SheetNames[0];
                     const worksheet = workbook.Sheets[sheetName];
-                    // *** CORRECCIÓN ***: Usar window.XLSX (mayúsculas)
                     const jsonRows = window.XLSX.utils.sheet_to_json(worksheet);
-
                     if (jsonRows.length === 0) throw new Error("El Excel está vacío.");
-
                     for (const [index, row] of jsonRows.entries()) {
                         const textRow = Object.entries(row).map(([key, value]) => `${key}: ${value}`).join(', ');
                         const parsedData = await parseMessageWithGemini(textRow);
                         excelPreviewData.push({ 
-                            tempId: index, // ID temporal para edición
+                            tempId: index,
                             ...parsedData 
                         });
                     }
-
                     renderExcelPreviewTable();
                     excelPreviewModal.classList.remove('hidden');
                     showMessage(`Vista previa generada. ${excelPreviewData.length} filas detectadas.`, false);
-
                 } catch (err) {
                     console.error("Error leyendo el Excel:", err);
                     showMessage(`Error al procesar el Excel: ${err.message}`, true);
@@ -479,14 +496,10 @@
             reader.readAsArrayBuffer(file);
         }
 
-        /**
-         * Renderiza la tabla editable en el modal de vista previa.
-         */
         function renderExcelPreviewTable() {
             excelPreviewTableContainer.innerHTML = '';
             const table = document.createElement('table');
             table.className = 'w-full min-w-max text-left text-sm';
-            
             table.innerHTML = `
                 <thead class="text-xs text-gray-700 uppercase bg-gray-50">
                     <tr>
@@ -500,12 +513,9 @@
                 </tbody>
             `;
             const tbody = table.querySelector('tbody');
-
-            // Opciones del <select>
             const tecnicaturaOptions = Object.keys(tecnicaturaMap)
                 .map(nombre => `<option value="${nombre}">${nombre}</option>`)
                 .join('');
-
             excelPreviewData.forEach(row => {
                 const tr = document.createElement('tr');
                 tr.className = 'bg-white border-b';
@@ -530,23 +540,16 @@
                         </select>
                     </td>
                 `;
-                // Asignar el valor seleccionado al select
                 const select = tr.querySelector('select');
                 select.value = row.tecnicatura || '';
-                
-                // Añadir listeners para actualizar el array en tiempo real
                 tr.querySelectorAll('input, select').forEach(el => {
                     el.addEventListener('change', (e) => updatePreviewData(e.target.dataset.id, e.target.dataset.field, e.target.value));
                 });
-                
                 tbody.appendChild(tr);
             });
             excelPreviewTableContainer.appendChild(table);
         }
 
-        /**
-         * Actualiza el array 'excelPreviewData' cuando el usuario edita la vista previa.
-         */
         function updatePreviewData(tempId, field, value) {
             const index = excelPreviewData.findIndex(row => row.tempId == tempId);
             if (index !== -1) {
@@ -554,31 +557,22 @@
             }
         }
 
-        /**
-         * Oculta el modal de vista previa y limpia los datos.
-         */
         function hideExcelPreviewModal() {
             excelPreviewModal.classList.add('hidden');
             excelPreviewData = [];
         }
 
-        /**
-         * Confirma la carga del Excel: toma los datos (editados) y los guarda.
-         */
         async function confirmExcelCarga() {
             hideExcelPreviewModal();
             showLoader(true);
             showMessage(`Guardando ${excelPreviewData.length} leads del Excel...`, false);
-            
             let successCount = 0;
             let errorCount = 0;
-
             for (const parsedRow of excelPreviewData) {
                 const success = await processAndSaveLead(parsedRow);
                 if (success) successCount++;
                 else errorCount++;
             }
-            
             showMessage(`Carga de Excel completada: ${successCount} guardados, ${errorCount} fallidos.`, errorCount > 0);
             excelPreviewData = [];
             showLoader(false);
@@ -587,13 +581,8 @@
 
         // --- Llamadas a la API de Gemini ---
 
-        /**
-         * Llama a Gemini para extraer datos de un TEXTO.
-         */
         async function parseMessageWithGemini(text) {
-            // Usamos la clave de API global definida al inicio
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`;
-
             const payload = {
                 contents: [{ parts: [{ text: text }] }],
                 systemInstruction: { parts: [{ text: systemPromptForGemini }] },
@@ -605,26 +594,19 @@
             return await makeGeminiApiCall(apiUrl, payload);
         }
 
-        /**
-         * Llama a Gemini para extraer datos de una IMAGEN.
-         */
         async function parseImageWithGemini(base64Data, mimeType) {
-            // Usamos la clave de API global definida al inicio
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`;
-
-            // *** CAMBIO ***: Instrucción de usuario actualizada para buscar el teléfono arriba.
             const userPromptForImage = `
                 Extrae el nombre, email, teléfono y la tecnicatura de esta imagen, que es una captura de pantalla de una conversación.
                 Importante: Primero, busca un número de teléfono en la parte SUPERIOR de la captura (el contacto de WhatsApp). 
                 Si lo encuentras, úsalo como el 'telefono'. Si no, busca el teléfono en el texto de la conversación.
             `;
-
             const payload = {
                 contents: [
                     { 
                         role: "user", 
                         parts: [
-                            { text: userPromptForImage }, // Usamos el prompt actualizado
+                            { text: userPromptForImage }, 
                             { inlineData: { mimeType: mimeType, data: base64Data } }
                         ]
                     }
@@ -638,9 +620,6 @@
             return await makeGeminiApiCall(apiUrl, payload);
         }
 
-        /**
-         * Motor genérico de llamada a la API con reintentos.
-         */
         async function makeGeminiApiCall(apiUrl, payload) {
             let response;
             let delay = 1000;
@@ -667,12 +646,9 @@
                     delay *= 2;
                 }
             }
-            
-            // Si después de 3 intentos no hay respuesta, 'response' será undefined
             if (!response) {
                 throw new Error("No se pudo obtener respuesta de la API después de 3 intentos.");
             }
-
             const result = await response.json();
             const candidate = result.candidates?.[0];
             if (candidate && candidate.content?.parts?.[0]?.text) {
@@ -692,6 +668,33 @@
             }
         }
 
+        // --- *** NUEVA *** Función Helper para Email de Excel ---
+        /**
+         * Genera un email ficticio a partir de un nombre.
+         */
+        function generateDummyEmail(name) {
+            if (!name) return 'sin.email@cervantes.edu.ar';
+            try {
+                const cleanName = name
+                    .toLowerCase()
+                    .normalize("NFD") // Separa acentos (ej. "é" -> "e" + "´")
+                    .replace(/[\u0300-\u036f]/g, "") // Elimina los acentos
+                    .replace(/[^a-z0-9\s]/g, '') // Elimina caracteres no alfanuméricos (excepto espacios)
+                    .trim()
+                    .replace(/\s+/g, '.'); // Reemplaza espacios con puntos
+                
+                // Evita que quede solo un punto si el nombre era inválido
+                if (cleanName === "" || cleanName === ".") {
+                    return 'sin.email@cervantes.edu.ar';
+                }
+                
+                return `${cleanName}@cervantes.edu.ar`;
+            } catch (err) {
+                console.error("Error generando email ficticio:", err);
+                return 'error.email@cervantes.edu.ar';
+            }
+        }
+
 
         // --- Lógica de Exportación a Excel ---
 
@@ -701,27 +704,30 @@
                 return;
             }
 
-            // *** CORRECCIÓN ***: Verificar si la librería XLSX (mayúsculas) está cargada.
             if (typeof window.XLSX === 'undefined') {
                 showMessage("La librería de Excel (XLSX) no se ha cargado. Revisa tu conexión o recarga la página.", true);
                 console.error("Error: La librería window.XLSX no está definida.");
                 return;
             }
 
-            const dataForExcel = currentLeads.map(lead => ({
-                'ID': '',
-                'Nombre Completo': lead.nombreCompleto,
-                'Email': lead.email,
-                'Teléfono': lead.telefono,
-                'Tecnicatura': lead.tecnicaturaId,
-                'Estado': lead.estado,
-                'Vendedor Asignado': lead.vendedorAsignado,
-                'Fecha de Creación': lead.fechaCreacion,
-                'Último Contacto': lead.ultimoContacto,
-                'Observaciones': lead.observaciones
-            }));
+            // *** CAMBIO ***: Generar email ficticio si está vacío
+            const dataForExcel = currentLeads.map(lead => {
+                const email = lead.email || generateDummyEmail(lead.nombreCompleto);
+                
+                return {
+                    'ID': '',
+                    'Nombre Completo': lead.nombreCompleto,
+                    'Email': email,
+                    'Teléfono': lead.telefono,
+                    'Tecnicatura': lead.tecnicaturaId,
+                    'Estado': lead.estado,
+                    'Vendedor Asignado': lead.vendedorAsignado,
+                    'Fecha de Creación': lead.fechaCreacion,
+                    'Último Contacto': lead.ultimoContacto,
+                    'Observaciones': lead.observaciones
+                };
+            });
             
-            // *** CORRECCIÓN ***: Usar window.XLSX (mayúsculas)
             const ws = window.XLSX.utils.json_to_sheet(dataForExcel, { header: excelHeaders });
             const wb = window.XLSX.utils.book_new();
             window.XLSX.utils.book_append_sheet(wb, ws, "Leads");
@@ -736,7 +742,7 @@
             descargarBtn.addEventListener('click', handleDescargarClick);
             limpiarBtn.addEventListener('click', handleLimpiarClick);
             
-            // Botones de carga de archivos (disparan inputs ocultos)
+            // Botones de carga de archivos
             procesarExcelBtn.addEventListener('click', () => excelInput.click());
             procesarImagenBtn.addEventListener('click', () => imagenInput.click()); 
 
@@ -744,13 +750,19 @@
             excelInput.addEventListener('change', handleExcelUpload);
             imagenInput.addEventListener('change', handleImageUpload);
             
-            // *** NUEVO LISTENER ***
-            // Escuchar el evento 'paste' en el textarea
+            // Listener de pegado (para imágenes)
             mensajeInput.addEventListener('paste', handlePaste);
 
-            // Controles del modal de limpieza
+            // Controles del modal de limpieza general
             confirmLimpiarBtn.addEventListener('click', confirmLimpiarDatos);
             cancelLimpiarBtn.addEventListener('click', hideConfirmModal);
+            
+            // *** NUEVO ***: Controles del modal de eliminación individual
+            confirmDeleteOneBtn.addEventListener('click', confirmDeleteOneLead);
+            cancelDeleteOneBtn.addEventListener('click', hideDeleteOneModal);
+            
+            // *** NUEVO ***: Listener de clic en la tabla para delegación de eventos
+            leadsTableBody.addEventListener('click', handleDeleteClick);
             
             // Controles del modal de vista previa de Excel
             confirmExcelCargaBtn.addEventListener('click', confirmExcelCarga);
@@ -764,10 +776,10 @@
 </head>
 <body class="bg-gray-100 font-sans antialiased">
 
-    <!-- Modal de Confirmación (Limpiar) -->
+    <!-- Modal de Confirmación (Limpiar TODO) -->
     <div id="confirmModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
         <div class="bg-white rounded-lg shadow-lg p-6 max-w-sm mx-auto">
-            <h3 class="text-lg font-medium text-gray-900">Confirmar Acción</h3>
+            <h3 class="text-lg font-medium text-gray-900">Confirmar Limpieza Total</h3>
             <p class="text-sm text-gray-500 mt-2">¿Estás seguro de que deseas eliminar TODOS los leads? Esta acción no se puede deshacer.</p>
             <div class="mt-4 flex justify-end space-x-2">
                 <button id="cancelLimpiarBtn" type="button" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancelar</button>
@@ -776,15 +788,25 @@
         </div>
     </div>
     
-    <!-- Modal de Vista Previa de Excel (NUEVO) -->
+    <!-- *** NUEVO *** Modal de Confirmación (Eliminar UNO) -->
+    <div id="confirmDeleteOneModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div class="bg-white rounded-lg shadow-lg p-6 max-w-sm mx-auto">
+            <h3 class="text-lg font-medium text-gray-900">Confirmar Eliminación</h3>
+            <p class="text-sm text-gray-500 mt-2">¿Estás seguro de que deseas eliminar a <strong id="deleteLeadName" class="text-gray-900">este lead</strong>?</p>
+            <div class="mt-4 flex justify-end space-x-2">
+                <button id="cancelDeleteOneBtn" type="button" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancelar</button>
+                <button id="confirmDeleteOneBtn" type="button" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">Eliminar</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal de Vista Previa de Excel -->
     <div id="excelPreviewModal" class="hidden fixed inset-0 z-40 flex items-center justify-center bg-black bg-opacity-60 p-4">
         <div class="bg-white rounded-lg shadow-2xl p-6 max-w-6xl w-full mx-auto flex flex-col" style="max-height: 90vh;">
             <h3 class="text-xl font-medium text-gray-900 mb-4">Vista Previa de Carga de Excel</h3>
             <p class="text-sm text-gray-600 mb-4">Corrige los datos detectados por la IA antes de guardarlos. Los cambios se guardan al salir del campo.</p>
             
-            <!-- Contenedor de la tabla con scroll -->
             <div id="excelPreviewTableContainer" class="overflow-auto flex-grow mb-4 border rounded-lg">
-                <!-- La tabla editable se generará aquí -->
                 <p class="text-center text-gray-500 p-8">Generando vista previa...</p>
             </div>
             
@@ -799,7 +821,6 @@
     <!-- Contenido Principal -->
     <div class="container mx-auto p-4 md:p-8 max-w-7xl">
         
-        <!-- Cabecera -->
         <header class="mb-6 flex justify-between items-center">
             <h1 class="text-3xl font-bold text-gray-800">Procesador de Leads</h1>
             <div id="loader" class="hidden">
@@ -807,7 +828,6 @@
             </div>
         </header>
 
-        <!-- Sección de Mensajes (Error o Éxito) -->
         <div id="messageBox" class="hidden border px-4 py-3 rounded-lg relative mb-4" role="alert">
             <strong class="font-bold">Aviso: </strong>
             <span id="messageText" class="block sm:inline"></span>
@@ -818,7 +838,6 @@
 
         <!-- Panel de Entrada -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-            <!-- Columna Izquierda: Texto y Acciones -->
             <div class="bg-white p-6 rounded-lg shadow-md">
                 <h2 class="text-xl font-semibold text-gray-700 mb-4">Opción 1: Pegar (Texto o Imagen)</h2>
                 <textarea id="mensajeInput"
@@ -830,11 +849,9 @@
                 </button>
             </div>
             
-            <!-- Columna Derecha: Archivos y Descarga -->
             <div class="bg-white p-6 rounded-lg shadow-md flex flex-col justify-between">
                 <div>
                     <h2 class="text-xl font-semibold text-gray-700 mb-4">Opción 2: Cargar archivos</h2>
-                    <!-- Inputs de archivo ocultos -->
                     <input type="file" id="excelInput" class="hidden" accept=".xlsx, .xls">
                     <input type="file" id="imagenInput" class="hidden" accept="image/*">
                     
@@ -876,9 +893,10 @@
                     <thead class="text-xs text-gray-700 uppercase bg-gray-50">
                         <tr>
                             <script>
+                                // *** CAMBIO ***: Añadida la columna "Acciones"
                                 const headers = [
                                     'ID', 'Nombre', 'Email', 'Teléfono', 'Tecnicatura', 'Estado',
-                                    'Vendedor', 'Creación', 'Contacto', 'Obs.'
+                                    'Vendedor', 'Creación', 'Contacto', 'Obs.', 'Acciones'
                                 ];
                                 headers.forEach(h => document.write(`<th scope="col" class="p-3">${h}</th>`));
                             </script>
@@ -886,7 +904,7 @@
                     </thead>
                     <tbody id="leadsTableBody">
                         <tr>
-                            <td colspan="10" class="text-center text-gray-500 p-4">Cargando datos...</td>
+                            <td colspan="11" class="text-center text-gray-500 p-4">Cargando datos...</td>
                         </tr>
                     </tbody>
                 </table>
