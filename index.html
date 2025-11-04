@@ -3,11 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Procesador de Leads v5.2</title>
+    <title>Procesador de Leads v5.3</title>
     <!-- Carga de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Carga de SheetJS (para exportar a Excel) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- *** CAMBIO ***: Se cambió el CDN de SheetJS a jsdelivr por si cloudflare está bloqueado -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    
     <!-- Carga de Firebase (para la base de datos) -->
     <script type="module">
         // Importar las funciones necesarias de Firebase
