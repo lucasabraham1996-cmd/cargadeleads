@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Procesador de Leads v5.3</title>
+    <title>Procesador de Leads v5.4</title>
     <!-- Carga de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- *** CAMBIO ***: Se cambió el CDN de SheetJS a jsdelivr por si cloudflare está bloqueado -->
+    <!-- Se cambió el CDN de SheetJS a jsdelivr por si cloudflare está bloqueado -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     
     <!-- Carga de Firebase (para la base de datos) -->
@@ -422,7 +422,7 @@
             reader.readAsDataURL(file);
         }
 
-        // --- Lógica de Carga de Excel (Sin cambios) ---
+        // --- Lógica de Carga de Excel ---
 
         /**
          * Maneja la selección de un archivo Excel.
@@ -441,9 +441,11 @@
             reader.onload = async (e) => {
                 try {
                     const data = e.target.result;
+                    // *** CORRECCIÓN ***: Usar window.XLSX (mayúsculas)
                     const workbook = window.XLSX.read(data, { type: 'array' });
                     const sheetName = workbook.SheetNames[0];
                     const worksheet = workbook.Sheets[sheetName];
+                    // *** CORRECCIÓN ***: Usar window.XLSX (mayúsculas)
                     const jsonRows = window.XLSX.utils.sheet_to_json(worksheet);
 
                     if (jsonRows.length === 0) throw new Error("El Excel está vacío.");
@@ -699,10 +701,10 @@
                 return;
             }
 
-            // *** CAMBIO ***: Verificar si la librería XLSX está cargada.
-            if (typeof window.xlsx === 'undefined') {
-                showMessage("La librería de Excel (xlsx) no se ha cargado. Revisa tu conexión o recarga la página.", true);
-                console.error("Error: La librería window.xlsx no está definida.");
+            // *** CORRECCIÓN ***: Verificar si la librería XLSX (mayúsculas) está cargada.
+            if (typeof window.XLSX === 'undefined') {
+                showMessage("La librería de Excel (XLSX) no se ha cargado. Revisa tu conexión o recarga la página.", true);
+                console.error("Error: La librería window.XLSX no está definida.");
                 return;
             }
 
@@ -718,11 +720,13 @@
                 'Último Contacto': lead.ultimoContacto,
                 'Observaciones': lead.observaciones
             }));
-            const ws = window.xlsx.utils.json_to_sheet(dataForExcel, { header: excelHeaders });
-            const wb = window.xlsx.utils.book_new();
-            window.xlsx.utils.book_append_sheet(wb, ws, "Leads");
+            
+            // *** CORRECCIÓN ***: Usar window.XLSX (mayúsculas)
+            const ws = window.XLSX.utils.json_to_sheet(dataForExcel, { header: excelHeaders });
+            const wb = window.XLSX.utils.book_new();
+            window.XLSX.utils.book_append_sheet(wb, ws, "Leads");
             const todayStr = new Date().toISOString().split('T')[0];
-            window.xlsx.writeFile(wb, `leads_export_${todayStr}.xlsx`);
+            window.XLSX.writeFile(wb, `leads_export_${todayStr}.xlsx`);
         }
 
         // --- Inicialización ---
