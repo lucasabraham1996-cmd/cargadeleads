@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Procesador de Leads v5.7</title>
+    <title>Procesador de Leads v5.8</title>
     <!-- Carga de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -218,6 +218,7 @@
             hideConfirmModal();
             showLoader(true);
             try {
+                if (!leadsCollectionRef) throw new Error("La base de datos no está lista.");
                 const querySnapshot = await getDocs(leadsCollectionRef);
                 const deletePromises = querySnapshot.docs.map(docSnapshot => 
                     deleteDoc(doc(leadsCollectionRef, docSnapshot.id)) // Usar referencia de colección
@@ -250,17 +251,16 @@
         }
 
         async function confirmDeleteOneLead() {
+            // *** CORRECCIÓN ***: Añadida verificación de leadsCollectionRef
             if (!leadIdToDelete || !leadsCollectionRef) {
-                showMessage("Error: No se pudo encontrar la referencia del lead.", true);
+                showMessage("Error: No se pudo encontrar la referencia del lead. Inténtalo de nuevo.", true);
+                hideDeleteOneModal();
                 return;
             }
+            
             hideDeleteOneModal();
             showLoader(true);
             try {
-                // *** CORRECCIÓN ***: 
-                // Se cambió doc(db, leadsCollectionRef.path, leadIdToDelete) 
-                // por doc(leadsCollectionRef, leadIdToDelete)
-                // Esta es la forma más robusta y correcta de referenciar un subdocumento.
                 await deleteDoc(doc(leadsCollectionRef, leadIdToDelete));
                 showMessage("Lead eliminado correctamente.", false);
             } catch (err) {
@@ -344,12 +344,59 @@
             messageBox.classList.add('hidden');
         }
 
-        // --- Lógica Central de Procesamiento ---
+        // --- *** NUEVO *** Verificador de Duplicados ---
+        /**
+         * Verifica si un lead ya existe en 'currentLeads' basado en email o teléfono.
+         * Devuelve un mensaje de error si es duplicado, o null si no lo es.
+         */
+        function checkIfLeadExists(email, phone) {
+            const newEmail = email ? email.trim() : '';
+            const newPhone = phone ? phone.trim() : '';
 
-        async function processAndSaveLead(parsedData) {
+            // No hacer nada si ambos están vacíos (permitir guardar)
+            if (!newEmail && !newPhone) {
+                return null;
+            }
+
+            if (newEmail) {
+                const emailExists = currentLeads.some(lead => lead.email === newEmail);
+                if (emailExists) {
+                    return `Este lead ya existe (Email: ${newEmail}).`;
+                }
+            }
+            if (newPhone) {
+                const phoneExists = currentLeads.some(lead => lead.telefono === newPhone);
+                if (phoneExists) {
+                    return `Este lead ya existe (Teléfono: ${newPhone}).`;
+                }
+            }
+            return null; // No es duplicado
+        }
+
+
+        // --- Lógica Central de Procesamiento ---
+        
+        /**
+         * Procesa y guarda un lead, ahora con verificación de duplicados.
+         * @param {object} parsedData - Los datos parseados por la IA.
+         * @param {boolean} showDuplicateMessage - Si debe mostrar un mensaje de error en caso de duplicado.
+         * @returns {boolean} - true si se guardó, false si no.
+         */
+        async function processAndSaveLead(parsedData, showDuplicateMessage = false) {
             if (!parsedData) {
                 return false;
             }
+            
+            // *** NUEVO ***: Verificación de duplicados
+            const duplicateError = checkIfLeadExists(parsedData.email, parsedData.telefono);
+            if (duplicateError) {
+                if (showDuplicateMessage) { // Mostrar solo en cargas manuales
+                    showMessage(duplicateError, true);
+                }
+                console.warn(`Omitiendo lead duplicado: ${duplicateError}`);
+                return false; // No guardar
+            }
+            
             try {
                 const tecnicaturaNombre = parsedData.tecnicatura || '';
                 const tecnicaturaId = tecnicaturaMap[tecnicaturaNombre] || '';
@@ -391,18 +438,22 @@
             
             try {
                 const parsedData = await parseMessageWithGemini(mensaje);
-                const success = await processAndSaveLead(parsedData);
+                // *** CAMBIO ***: Pasa 'true' para mostrar error de duplicado
+                const success = await processAndSaveLead(parsedData, true); 
+                
                 if (success) {
                     mensajeInput.value = '';
                     showMessage("Lead agregado correctamente.", false);
-                } else {
+                } else if (!checkIfLeadExists(parsedData.email, parsedData.telefono)) {
+                    // Si 'success' es falso, pero NO es por un duplicado, mostrar error genérico.
                     showMessage("No se pudo procesar el lead. Revisa el texto.", true);
                 }
             } catch (err) {
                  showMessage(`Error de IA: ${err.message}`, true);
+            } finally {
+                // *** CORRECCIÓN ***: Mover showLoader a 'finally'
+                showLoader(false);
             }
-            
-            showLoader(false);
         }
 
         // --- Lógica de Carga de Imagen ---
@@ -437,10 +488,13 @@
                     const base64DataUrl = e.target.result;
                     const base64Data = base64DataUrl.split(',')[1];
                     const parsedData = await parseImageWithGemini(base64Data, file.type);
-                    const success = await processAndSaveLead(parsedData);
+                    
+                    // *** CAMBIO ***: Pasa 'true' para mostrar error de duplicado
+                    const success = await processAndSaveLead(parsedData, true);
+
                     if (success) {
                         showMessage("Lead extraído de la imagen y agregado.", false);
-                    } else {
+                    } else if (!checkIfLeadExists(parsedData.email, parsedData.telefono)) {
                         showMessage("No se pudo procesar la imagen. Intenta con una captura más clara.", true);
                     }
                 } catch (err) {
@@ -477,7 +531,6 @@
                     if (jsonRows.length === 0) throw new Error("El Excel está vacío.");
                     for (const [index, row] of jsonRows.entries()) {
                         const textRow = Object.entries(row).map(([key, value]) => `${key}: ${value}`).join(', ');
-                        // La IA detecta la carrera aquí
                         const parsedData = await parseMessageWithGemini(textRow);
                         excelPreviewData.push({ 
                             tempId: index,
@@ -548,7 +601,6 @@
                     </td>
                 `;
                 const select = tr.querySelector('select');
-                // Aquí se setea la carrera detectada. Si es '', te deja elegir.
                 select.value = row.tecnicatura || '';
                 tr.querySelectorAll('input, select').forEach(el => {
                     el.addEventListener('change', (e) => updatePreviewData(e.target.dataset.id, e.target.dataset.field, e.target.value));
@@ -577,11 +629,13 @@
             let successCount = 0;
             let errorCount = 0;
             for (const parsedRow of excelPreviewData) {
-                const success = await processAndSaveLead(parsedRow);
+                // *** CAMBIO ***: Pasa 'false' para NO mostrar error de duplicado por cada fila
+                const success = await processAndSaveLead(parsedRow, false); 
                 if (success) successCount++;
                 else errorCount++;
             }
-            showMessage(`Carga de Excel completada: ${successCount} guardados, ${errorCount} fallidos.`, errorCount > 0);
+            // *** CAMBIO ***: Mensaje de finalización actualizado
+            showMessage(`Carga de Excel completada: ${successCount} guardados, ${errorCount} omitidos (duplicados o fallidos).`, errorCount > 0);
             excelPreviewData = [];
             showLoader(false);
         }
@@ -920,4 +974,3 @@
 
 </body>
 </html>
-
