@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leads iOS Glass v6.1</title>
+    <title>Convertidor de WhatsApp a Leads v6.2</title>
     <!-- Carga de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -38,6 +38,12 @@
             -webkit-backdrop-filter: blur(20px);
             border: 1px solid rgba(255, 255, 255, 0.2);
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        .glass-stat-card {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
         }
 
         .glass-input {
@@ -250,12 +256,48 @@
                 
                 const { id, ...dataToSave } = newLead;
                 await addDoc(leadsCollectionRef, dataToSave);
+                
+                // Actualizar estadísticas históricas (Local Storage)
+                window.updateLocalStats(parsedData.preferencia_contacto);
+                
                 return true;
             } catch (err) {
                 console.error("Save Error:", err);
                 return false;
             }
         }
+
+        // --- Stats Logic (Local Storage) ---
+        window.updateLocalStats = (preference) => {
+            let stats = JSON.parse(localStorage.getItem('leadStats')) || { total: 0, wpp: 0, call: 0 };
+            
+            stats.total++;
+            if(preference === 'WhatsApp') stats.wpp++;
+            if(preference === 'Llamada') stats.call++;
+            
+            localStorage.setItem('leadStats', JSON.stringify(stats));
+            window.renderStatsUI();
+        };
+
+        window.renderStatsUI = () => {
+            let stats = JSON.parse(localStorage.getItem('leadStats')) || { total: 0, wpp: 0, call: 0 };
+            
+            // Cálculos de porcentaje
+            const wppPercent = stats.total > 0 ? Math.round((stats.wpp / stats.total) * 100) : 0;
+            const callPercent = stats.total > 0 ? Math.round((stats.call / stats.total) * 100) : 0;
+            
+            // Actualizar DOM
+            document.getElementById('statTotal').textContent = stats.total;
+            document.getElementById('statWpp').textContent = `${stats.wpp} (${wppPercent}%)`;
+            document.getElementById('statCall').textContent = `${stats.call} (${callPercent}%)`;
+        };
+
+        window.resetStats = () => {
+            if(confirm("¿Reiniciar el historial de estadísticas a cero? Esto no borra los leads de la tabla, solo los contadores.")) {
+                localStorage.setItem('leadStats', JSON.stringify({ total: 0, wpp: 0, call: 0 }));
+                window.renderStatsUI();
+            }
+        };
 
         // --- Handlers y Funciones Globales ---
         
@@ -283,7 +325,7 @@
                 const snapshot = await getDocs(leadsCollectionRef);
                 const deletePromises = snapshot.docs.map(d => deleteDoc(doc(leadsCollectionRef, d.id)));
                 await Promise.all(deletePromises);
-                window.showMessage("Base de datos limpiada.", false);
+                window.showMessage("Base de datos de leads limpiada (Historial conservado).", false);
             } catch (e) {
                 window.showMessage("Error al limpiar: " + e.message, true);
             } finally {
@@ -488,6 +530,7 @@
         // DOM Loaded
         document.addEventListener('DOMContentLoaded', () => {
             setupFirebase();
+            window.renderStatsUI(); // Init stats
             
             // Buttons
             document.getElementById('procesarBtn').addEventListener('click', async () => {
@@ -523,20 +566,30 @@
                 window.showLoader(false);
             };
 
-            // *** EXPORTACIÓN DE EXCEL ACTUALIZADA (Todas las columnas) ***
+            // *** EXPORTACIÓN DE EXCEL ACTUALIZADA (Textos personalizados) ***
             document.getElementById('descargarBtn').onclick = () => {
-                 const dataForExcel = currentLeads.map(l => ({
-                     'ID': l.id,
-                     'Nombre Completo': l.nombreCompleto,
-                     'Email': l.email,
-                     'Teléfono': l.telefono,
-                     'Tecnicatura': l.tecnicaturaId || '',
-                     'Estado': l.estado,
-                     'Vendedor Asignado': l.vendedorAsignado || '',
-                     'Fecha de Creación': l.fechaCreacion,
-                     'Último Contacto': l.ultimoContacto || '',
-                     'Observaciones': l.observaciones
-                 }));
+                 const dataForExcel = currentLeads.map(l => {
+                     // Lógica de observación personalizada
+                     let obsExport = "Exportado desde WhatsApp Comercial";
+                     if (l.observaciones && l.observaciones.includes('WhatsApp')) {
+                         obsExport = "Exportado desde WhatsApp Comercial - Prefiere info a través de WhatsApp";
+                     } else if (l.observaciones && l.observaciones.includes('Llamada')) {
+                         obsExport = "Exportado desde WhatsApp Comercial - Prefiere llamado teléfonico para asesoramiento";
+                     }
+
+                     return {
+                         'ID': l.id,
+                         'Nombre Completo': l.nombreCompleto,
+                         'Email': l.email,
+                         'Teléfono': l.telefono,
+                         'Tecnicatura': l.tecnicaturaId || '',
+                         'Estado': l.estado,
+                         'Vendedor Asignado': l.vendedorAsignado || '',
+                         'Fecha de Creación': l.fechaCreacion,
+                         'Último Contacto': l.ultimoContacto || '',
+                         'Observaciones': obsExport
+                     };
+                 });
                  const ws = window.XLSX.utils.json_to_sheet(dataForExcel);
                  const wb = window.XLSX.utils.book_new();
                  window.XLSX.utils.book_append_sheet(wb, ws, "Leads");
@@ -583,8 +636,8 @@
     <!-- Header & Loader -->
     <header class="w-full max-w-7xl mb-8 flex justify-between items-center glass-panel rounded-2xl p-6">
         <div>
-            <h1 class="text-3xl font-bold tracking-tight">Convertido de WhatsApp a Lead</h1>
-            <p class="text-white/60 text-sm mt-1">Departamento Comercial</p>
+            <h1 class="text-3xl font-bold tracking-tight">Convertidor de WhatsApp a Leads</h1>
+            <p class="text-white/60 text-sm mt-1">Dpto. Comercial (versión 6.2)</p>
         </div>
         <div id="loader" class="hidden">
             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
@@ -601,6 +654,22 @@
         
         <!-- Columna Izquierda: Input -->
         <section class="lg:col-span-5 flex flex-col gap-6">
+            <!-- Stats Dashboard (Glass Cards) -->
+            <div class="grid grid-cols-3 gap-3">
+                <div class="glass-stat-card p-3 rounded-2xl flex flex-col items-center justify-center text-center">
+                    <span class="text-xs text-white/60 uppercase tracking-wide">Procesados</span>
+                    <span id="statTotal" class="text-2xl font-bold text-white mt-1">0</span>
+                </div>
+                <div class="glass-stat-card p-3 rounded-2xl flex flex-col items-center justify-center text-center">
+                    <span class="text-xs text-green-300/80 uppercase tracking-wide">WhatsApp</span>
+                    <span id="statWpp" class="text-xl font-bold text-green-300 mt-1">0%</span>
+                </div>
+                <div class="glass-stat-card p-3 rounded-2xl flex flex-col items-center justify-center text-center">
+                    <span class="text-xs text-blue-300/80 uppercase tracking-wide">Llamados</span>
+                    <span id="statCall" class="text-xl font-bold text-blue-300 mt-1">0%</span>
+                </div>
+            </div>
+
             <!-- Panel de Texto -->
             <div class="glass-panel rounded-3xl p-6 relative overflow-hidden group">
                 <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-400 to-purple-400"></div>
@@ -640,7 +709,7 @@
                     ⬇ Descargar
                 </button>
                 <button id="limpiarBtn" disabled class="glass-button py-3 rounded-xl font-medium text-red-300 hover:text-red-100 bg-red-500/10 hover:bg-red-500/30">
-                    🗑 Limpiar
+                    🗑 Limpiar DB
                 </button>
             </div>
         </section>
@@ -649,7 +718,10 @@
         <section class="lg:col-span-7">
             <div class="glass-panel rounded-3xl overflow-hidden h-full flex flex-col min-h-[600px]">
                 <div class="p-6 border-b border-white/10 flex justify-between items-center">
-                    <h2 class="text-xl font-bold">Base de Datos</h2>
+                    <div>
+                        <h2 class="text-xl font-bold">Base de Datos</h2>
+                        <span class="text-xs text-white/50">Historial persistente: <span onclick="window.resetStats()" class="cursor-pointer hover:text-red-300 underline" title="Clic para reiniciar contadores">Resetear contadores</span></span>
+                    </div>
                     <span class="text-xs px-2 py-1 rounded bg-white/10 text-white/60">Live Sync</span>
                 </div>
                 <div class="overflow-auto flex-grow">
@@ -693,10 +765,10 @@
     <div id="confirmModal" class="hidden fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/40">
         <div class="glass-panel p-8 rounded-3xl max-w-sm w-full mx-4">
             <h3 class="text-xl font-bold mb-2 text-red-300">⚠️ Zona de Peligro</h3>
-            <p class="text-white/70 text-sm mb-6">Estás a punto de borrar <strong>TODA</strong> la base de datos.</p>
+            <p class="text-white/70 text-sm mb-6">Estás a punto de borrar <strong>TODA</strong> la tabla de leads para empezar a cargar de nuevo.<br><br><span class="text-green-300 text-xs font-bold">NOTA: Tu historial de estadísticas NO se borrará.</span></p>
             <div class="flex justify-end gap-3">
                 <button class="close-modal glass-button px-4 py-2 rounded-lg text-sm">Cancelar</button>
-                <button onclick="window.confirmLimpiarDatos()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg shadow-lg shadow-red-600/30 transition text-sm font-medium">Borrar Todo</button>
+                <button onclick="window.confirmLimpiarDatos()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg shadow-lg shadow-red-600/30 transition text-sm font-medium">Borrar Tabla</button>
             </div>
         </div>
     </div>
