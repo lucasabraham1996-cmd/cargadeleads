@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Convertidor de WhatsApp a Leads v6.2</title>
+    <title>Convertidor de WhatsApp a Leads v6.3</title>
     <!-- Carga de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -38,12 +38,23 @@
             -webkit-backdrop-filter: blur(20px);
             border: 1px solid rgba(255, 255, 255, 0.2);
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .glass-panel:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.3);
         }
 
         .glass-stat-card {
             background: rgba(0, 0, 0, 0.2);
             border: 1px solid rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(10px);
+            transition: transform 0.3s ease, background 0.3s;
+        }
+        .glass-stat-card:hover {
+            background: rgba(0, 0, 0, 0.4);
+            transform: translateY(-2px);
         }
 
         .glass-input {
@@ -56,30 +67,72 @@
             background: rgba(0, 0, 0, 0.4);
             border-color: rgba(255, 255, 255, 0.5);
             outline: none;
+            box-shadow: 0 0 0 2px rgba(255,255,255,0.2);
         }
         .glass-input::placeholder {
             color: rgba(255, 255, 255, 0.5);
         }
+        /* Para que los options del select sean legibles */
+        .glass-input option {
+            background-color: #333;
+            color: white;
+        }
 
         .glass-button {
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.1);
             border: 1px solid rgba(255, 255, 255, 0.2);
             backdrop-filter: blur(4px);
             transition: all 0.3s ease;
+            font-weight: 600;
         }
-        .glass-button:hover:not(:disabled) {
-            background: rgba(255, 255, 255, 0.35);
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        
+        /* Efectos Hover Específicos */
+        .btn-primary:hover:not(:disabled) {
+            background: rgba(59, 130, 246, 0.9); /* Azul intenso */
+            border-color: rgba(59, 130, 246, 1);
+            color: white;
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
+        }
+        
+        .btn-success:hover:not(:disabled) {
+            background: rgba(16, 185, 129, 0.9); /* Verde intenso */
+            border-color: rgba(16, 185, 129, 1);
+            color: white;
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.5);
+        }
+        
+        .btn-danger:hover:not(:disabled) {
+            background: rgba(239, 68, 68, 0.9); /* Rojo intenso */
+            border-color: rgba(239, 68, 68, 1);
+            color: white;
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.5);
+        }
+
+        .btn-upload-excel:hover {
+            background: rgba(5, 150, 105, 0.8); /* Esmeralda */
+            color: white;
+        }
+        
+        .btn-upload-img:hover {
+            background: rgba(79, 70, 229, 0.8); /* Indigo */
+            color: white;
+        }
+
+        .glass-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
         
         .glass-table-header {
-            background: rgba(0, 0, 0, 0.3);
-            color: rgba(255, 255, 255, 0.9);
+            background: rgba(0, 0, 0, 0.4);
+            color: rgba(255, 255, 255, 1);
         }
         
+        .glass-row {
+            transition: background 0.2s;
+        }
         .glass-row:hover {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.15);
         }
 
         /* Scrollbar personalizada */
@@ -103,7 +156,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, query, onSnapshot, setLogLevel, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, query, onSnapshot, setLogLevel, getDocs, deleteDoc, updateDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Configuración ---
         const GEMINI_API_KEY = "AIzaSyClcQiTJj91vzb0P5737owh4tUyJPLWgEA"; 
@@ -150,6 +203,7 @@
         let currentLeads = [];
         let excelPreviewData = [];
         let leadIdToDelete = null; 
+        let leadIdToEdit = null;
         
         // --- Firebase Init ---
         async function setupFirebase() {
@@ -200,11 +254,11 @@
                 
                 if(descargarBtn) {
                     descargarBtn.disabled = !hasLeads;
-                    descargarBtn.style.opacity = hasLeads ? "1" : "0.5";
+                    descargarBtn.classList.toggle('opacity-50', !hasLeads);
                 }
                 if(limpiarBtn) {
                     limpiarBtn.disabled = !hasLeads;
-                    limpiarBtn.style.opacity = hasLeads ? "1" : "0.5";
+                    limpiarBtn.classList.toggle('opacity-50', !hasLeads);
                 }
             });
         }
@@ -267,6 +321,72 @@
             }
         }
 
+        // --- Update Logic (Edición) ---
+        window.openEditModal = (id) => {
+            const lead = currentLeads.find(l => l.id === id);
+            if (!lead) return;
+
+            leadIdToEdit = id;
+            document.getElementById('editNombre').value = lead.nombreCompleto;
+            document.getElementById('editEmail').value = lead.email;
+            document.getElementById('editTelefono').value = lead.telefono;
+            
+            // Set Tecnicatura Select
+            // Necesitamos encontrar la llave del mapa basada en el ID, o poner el ID directamente si el select usa IDs.
+            // El mapa es Nombre -> ID. El Select debe usar ID como value.
+            const tecSelect = document.getElementById('editTecnicatura');
+            tecSelect.value = lead.tecnicaturaId || "";
+
+            // Set Preferencia Select basada en observaciones
+            const prefSelect = document.getElementById('editPreferencia');
+            if (lead.observaciones && lead.observaciones.includes('WhatsApp')) {
+                prefSelect.value = 'WhatsApp';
+            } else if (lead.observaciones && lead.observaciones.includes('Llamada')) {
+                prefSelect.value = 'Llamada';
+            } else {
+                prefSelect.value = 'Indiferente';
+            }
+
+            document.getElementById('editModal').classList.remove('hidden');
+        };
+
+        window.confirmEditLead = async () => {
+            if (!leadIdToEdit) return;
+            
+            window.showLoader(true);
+            try {
+                const nombre = document.getElementById('editNombre').value;
+                const email = document.getElementById('editEmail').value;
+                const telefono = document.getElementById('editTelefono').value;
+                const tecnicaturaId = document.getElementById('editTecnicatura').value;
+                const preferencia = document.getElementById('editPreferencia').value;
+
+                let observacionesFinal = '';
+                if (preferencia && preferencia !== 'Indiferente') {
+                    observacionesFinal = `Prefiere: ${preferencia}`;
+                }
+
+                const leadRef = doc(db, 'leads', leadIdToEdit);
+                await updateDoc(leadRef, {
+                    nombreCompleto: nombre,
+                    email: email,
+                    telefono: telefono,
+                    tecnicaturaId: parseInt(tecnicaturaId) || '',
+                    observaciones: observacionesFinal // Actualizamos la observación basada en la nueva preferencia
+                });
+
+                window.showMessage("Lead actualizado correctamente.", false);
+                document.getElementById('editModal').classList.add('hidden');
+                leadIdToEdit = null;
+
+            } catch (err) {
+                console.error("Update Error:", err);
+                window.showMessage(`Error al actualizar: ${err.message}`, true);
+            } finally {
+                window.showLoader(false);
+            }
+        };
+
         // --- Stats Logic (Local Storage) ---
         window.updateLocalStats = (preference) => {
             let stats = JSON.parse(localStorage.getItem('leadStats')) || { total: 0, wpp: 0, call: 0 };
@@ -301,12 +421,11 @@
 
         // --- Handlers y Funciones Globales ---
         
-        // Exponer funciones al window para que el HTML onclick funcione
         window.showMessage = (msg, isError) => {
             const messageText = document.getElementById('messageText');
             const messageBox = document.getElementById('messageBox');
             messageText.textContent = msg;
-            messageBox.className = `glass-panel rounded-xl p-4 mb-6 flex justify-between items-center ${isError ? 'border-red-400/50 text-red-100 bg-red-900/30' : 'border-green-400/50 text-green-100 bg-green-900/30'}`;
+            messageBox.className = `glass-panel rounded-xl p-4 mb-6 flex justify-between items-center border ${isError ? 'border-red-400 bg-red-900/50 text-white' : 'border-green-400 bg-green-900/50 text-white'}`;
             messageBox.classList.remove('hidden');
         };
 
@@ -339,8 +458,7 @@
              
              window.showLoader(true);
              try {
-                // Forzamos la eliminación usando la referencia directa
-                const docRef = doc(db, 'leads', leadIdToDelete); // Usamos db y path explícito para seguridad
+                const docRef = doc(db, 'leads', leadIdToDelete); 
                 await deleteDoc(docRef);
                 window.showMessage("Lead eliminado correctamente.", false);
              } catch(e) {
@@ -378,7 +496,6 @@
             return await makeGeminiApiCall(apiUrl, payload);
         }
 
-        // *** FUNCIÓN DE CONEXIÓN CORREGIDA PARA MOSTRAR ERRORES REALES ***
         async function makeGeminiApiCall(apiUrl, payload) {
             try {
                 const response = await fetch(apiUrl, {
@@ -405,7 +522,7 @@
                 const result = await response.json();
                 
                 if (!result.candidates || !result.candidates.length) {
-                    throw new Error("La IA no devolvió resultados. (Posible bloqueo de seguridad)");
+                    throw new Error("La IA no devolvió resultados.");
                 }
 
                 return JSON.parse(result.candidates[0].content.parts[0].text);
@@ -448,10 +565,15 @@
                     <td class="p-4 text-xs text-white/60">${lead.fechaCreacion}</td>
                     <td class="p-4 text-sm">${obsHtml}</td>
                     <td class="p-4 text-center">
-                        <button class="delete-btn text-red-300 hover:text-red-100 p-1 hover:bg-red-500/20 rounded transition" 
-                                data-id="${lead.id}" data-name="${lead.nombreCompleto}">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                        </button>
+                        <div class="flex justify-center gap-2">
+                             <button onclick="window.openEditModal('${lead.id}')" class="text-blue-300 hover:text-white p-1 hover:bg-blue-500/40 rounded transition" title="Editar Lead">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                            </button>
+                            <button class="delete-btn text-red-300 hover:text-white p-1 hover:bg-red-500/40 rounded transition" 
+                                    data-id="${lead.id}" data-name="${lead.nombreCompleto}" title="Eliminar Lead">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                        </div>
                     </td>
                 `;
                 leadsTableBody.appendChild(tr);
@@ -530,7 +652,7 @@
         // DOM Loaded
         document.addEventListener('DOMContentLoaded', () => {
             setupFirebase();
-            window.renderStatsUI(); // Init stats
+            window.renderStatsUI(); 
             
             // Buttons
             document.getElementById('procesarBtn').addEventListener('click', async () => {
@@ -566,10 +688,9 @@
                 window.showLoader(false);
             };
 
-            // *** EXPORTACIÓN DE EXCEL ACTUALIZADA (Textos personalizados) ***
+            // *** EXPORTACIÓN DE EXCEL ***
             document.getElementById('descargarBtn').onclick = () => {
                  const dataForExcel = currentLeads.map(l => {
-                     // Lógica de observación personalizada
                      let obsExport = "Exportado desde WhatsApp Comercial";
                      if (l.observaciones && l.observaciones.includes('WhatsApp')) {
                          obsExport = "Exportado desde WhatsApp Comercial - Prefiere info a través de WhatsApp";
@@ -637,7 +758,7 @@
     <header class="w-full max-w-7xl mb-8 flex justify-between items-center glass-panel rounded-2xl p-6">
         <div>
             <h1 class="text-3xl font-bold tracking-tight">Convertidor de WhatsApp a Leads</h1>
-            <p class="text-white/60 text-sm mt-1">Dpto. Comercial (versión 6.2)</p>
+            <p class="text-white/60 text-sm mt-1">Dpto. Comercial (versión 6.3)</p>
         </div>
         <div id="loader" class="hidden">
             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
@@ -645,9 +766,9 @@
     </header>
 
     <!-- Caja de Mensajes Flotante -->
-    <div id="messageBox" class="hidden fixed top-24 right-8 max-w-sm z-50 shadow-2xl backdrop-blur-md">
-        <span id="messageText" class="font-medium"></span>
-        <button onclick="window.hideMessage()" class="ml-4 text-white/70 hover:text-white">&times;</button>
+    <div id="messageBox" class="hidden fixed top-24 right-8 max-w-sm z-50 shadow-2xl backdrop-blur-md transition-all duration-300">
+        <span id="messageText" class="font-medium block"></span>
+        <button onclick="window.hideMessage()" class="absolute top-2 right-2 text-white/70 hover:text-white">&times;</button>
     </div>
 
     <main class="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -680,7 +801,7 @@
                 <textarea id="mensajeInput" 
                     class="glass-input w-full h-40 p-4 rounded-xl text-sm resize-none mb-4" 
                     placeholder="Pega un chat, un email o haz CTRL+V con una captura de pantalla (imagen). La IA lo procesará..."></textarea>
-                <button id="procesarBtn" class="glass-button w-full py-3 rounded-xl font-semibold text-white bg-blue-500/20 hover:bg-blue-500/40 border-blue-400/30">
+                <button id="procesarBtn" class="glass-button btn-primary w-full py-3 rounded-xl text-white">
                     ✨ Procesar con IA
                 </button>
             </div>
@@ -689,12 +810,12 @@
             <div class="glass-panel rounded-3xl p-6">
                 <h2 class="text-lg font-semibold mb-4">Carga Masiva</h2>
                 <div class="grid grid-cols-2 gap-4">
-                    <button onclick="document.getElementById('excelInput').click()" class="glass-button py-8 rounded-2xl flex flex-col items-center justify-center gap-2 hover:bg-emerald-500/20">
-                        <svg class="w-8 h-8 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    <button onclick="document.getElementById('excelInput').click()" class="glass-button btn-upload-excel py-8 rounded-2xl flex flex-col items-center justify-center gap-2">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                         <span class="text-sm font-medium">Excel</span>
                     </button>
-                    <button onclick="document.getElementById('imagenInput').click()" class="glass-button py-8 rounded-2xl flex flex-col items-center justify-center gap-2 hover:bg-indigo-500/20">
-                        <svg class="w-8 h-8 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    <button onclick="document.getElementById('imagenInput').click()" class="glass-button btn-upload-img py-8 rounded-2xl flex flex-col items-center justify-center gap-2">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                         <span class="text-sm font-medium">Imagen</span>
                     </button>
                 </div>
@@ -705,10 +826,10 @@
             
              <!-- Acciones -->
              <div class="grid grid-cols-2 gap-4">
-                <button id="descargarBtn" disabled class="glass-button py-3 rounded-xl font-medium text-white/80 hover:text-white bg-white/5">
+                <button id="descargarBtn" disabled class="glass-button btn-success py-3 rounded-xl font-medium text-white">
                     ⬇ Descargar
                 </button>
-                <button id="limpiarBtn" disabled class="glass-button py-3 rounded-xl font-medium text-red-300 hover:text-red-100 bg-red-500/10 hover:bg-red-500/30">
+                <button id="limpiarBtn" disabled class="glass-button btn-danger py-3 rounded-xl font-medium text-white">
                     🗑 Limpiar DB
                 </button>
             </div>
@@ -748,6 +869,54 @@
             </div>
         </section>
     </main>
+    
+    <!-- Modal Edit Lead (Glass) -->
+    <div id="editModal" class="hidden fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/50">
+        <div class="glass-panel p-8 rounded-3xl w-full max-w-md">
+             <h3 class="text-xl font-bold mb-4">Editar Lead</h3>
+             <div class="space-y-4">
+                 <div>
+                     <label class="block text-xs uppercase text-white/60 mb-1">Nombre</label>
+                     <input type="text" id="editNombre" class="glass-input w-full p-2 rounded-lg">
+                 </div>
+                 <div>
+                     <label class="block text-xs uppercase text-white/60 mb-1">Email</label>
+                     <input type="email" id="editEmail" class="glass-input w-full p-2 rounded-lg">
+                 </div>
+                 <div>
+                     <label class="block text-xs uppercase text-white/60 mb-1">Teléfono</label>
+                     <input type="text" id="editTelefono" class="glass-input w-full p-2 rounded-lg">
+                 </div>
+                 <div>
+                     <label class="block text-xs uppercase text-white/60 mb-1">Tecnicatura</label>
+                     <select id="editTecnicatura" class="glass-input w-full p-2 rounded-lg">
+                         <option value="">-- Seleccionar --</option>
+                         <!-- Opciones generadas manualmente para mantener el mapeo -->
+                         <option value="1">Desarrollo web</option>
+                         <option value="2">Administración de empresas</option>
+                         <option value="3">Marketing</option>
+                         <option value="4">Higiene y seguridad</option>
+                         <option value="5">Gestión inmobiliaria</option>
+                         <option value="6">Analista de sistemas</option>
+                         <option value="7">Ciencia de datos e IA</option>
+                         <option value="8">Recursos humanos</option>
+                     </select>
+                 </div>
+                 <div>
+                     <label class="block text-xs uppercase text-white/60 mb-1">Preferencia Contacto</label>
+                     <select id="editPreferencia" class="glass-input w-full p-2 rounded-lg">
+                         <option value="WhatsApp">WhatsApp</option>
+                         <option value="Llamada">Llamada</option>
+                         <option value="Indiferente">Indiferente</option>
+                     </select>
+                 </div>
+             </div>
+             <div class="flex justify-end gap-3 mt-6">
+                <button class="close-modal glass-button px-4 py-2 rounded-lg text-sm">Cancelar</button>
+                <button onclick="window.confirmEditLead()" class="btn-primary glass-button px-4 py-2 rounded-lg text-white">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Modal Confirm Delete (Glass) -->
     <div id="confirmDeleteOneModal" class="hidden fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/40">
