@@ -3,178 +3,182 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Procesador de Leads v5.8</title>
+    <title>Leads iOS Glass v6.1</title>
     <!-- Carga de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Se cambió el CDN de SheetJS a jsdelivr -->
+    <!-- Librería XLSX -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     
-    <!-- Carga de Firebase (para la base de datos) -->
+    <!-- Fuentes estilo Apple -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Estilos personalizados para Glassmorphism y Scrollbars -->
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 30%, #db2777 70%, #ea580c 100%);
+            background-attachment: fixed;
+            background-size: 200% 200%;
+            animation: gradientBG 15s ease infinite;
+            color: #ffffff;
+            min-height: 100vh;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* Clases utilitarias de Vidrio (Glass) */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        .glass-input {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            transition: all 0.3s ease;
+        }
+        .glass-input:focus {
+            background: rgba(0, 0, 0, 0.4);
+            border-color: rgba(255, 255, 255, 0.5);
+            outline: none;
+        }
+        .glass-input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .glass-button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(4px);
+            transition: all 0.3s ease;
+        }
+        .glass-button:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.35);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+        
+        .glass-table-header {
+            background: rgba(0, 0, 0, 0.3);
+            color: rgba(255, 255, 255, 0.9);
+        }
+        
+        .glass-row:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Scrollbar personalizada */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05); 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2); 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.4); 
+        }
+    </style>
+
+    <!-- Carga de Firebase -->
     <script type="module">
-        // Importar las funciones necesarias de Firebase
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, onSnapshot, setLogLevel, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- Configuración de la Aplicación ---
-        
+        // --- Configuración ---
         const GEMINI_API_KEY = "AIzaSyClcQiTJj91vzb0P5737owh4tUyJPLWgEA"; 
         
-        // Mapa de Tecnicaturas (Nombre a ID)
+        // Mapa de Tecnicaturas
         const tecnicaturaMap = {
-            'Desarrollo web': 1,
-            'Administración de empresas': 2,
-            'Marketing': 3,
-            'Higiene y seguridad': 4,
-            'Gestión inmobiliaria': 5,
-            'Analista de sistemas': 6,
-            'Ciencia de datos e IA': 7,
-            'Recursos humanos': 8
+            'Desarrollo web': 1, 'Administración de empresas': 2, 'Marketing': 3,
+            'Higiene y seguridad': 4, 'Gestión inmobiliaria': 5, 'Analista de sistemas': 6,
+            'Ciencia de datos e IA': 7, 'Recursos humanos': 8
         };
         const tecnicaturaNameMap = Object.fromEntries(Object.entries(tecnicaturaMap).map(([key, value]) => [value, key]));
 
-        // Encabezados del Excel (como en tu imagen)
-        const excelHeaders = [
-            'ID',
-            'Nombre Completo',
-            'Email',
-            'Teléfono',
-            'Tecnicatura',
-            'Estado',
-            'Vendedor Asignado',
-            'Fecha de Creación',
-            'Último Contacto',
-            'Observaciones'
-        ];
-        
-        // Instrucción del Sistema para la IA (reutilizable)
+        // --- PROMPT DE IA ---
         const systemPromptForGemini = `
-            Eres un asistente de entrada de datos para una institución educativa.
-            Tu tarea es extraer la siguiente información de un texto o imagen: 
-            nombre completo, email, teléfono y el nombre de la tecnicatura.
-            Debes identificar los datos y devolverlos en formato JSON.
+            Eres un asistente inteligente de entrada de datos.
+            Tu tarea es extraer: nombre completo, email, teléfono, la tecnicatura y la PREFERENCIA DE CONTACTO.
 
             *** REGLAS IMPORTANTES ***
-            1.  Unificación de Nombre: Si encuentras campos 'Nombre' y 'Apellido' separados, 
-                o 'First Name' y 'Last Name', unifícalos en un solo campo 'nombre' (ej. 'Juan Perez').
-            
-            2.  Mapeo de Tecnicatura: Para el campo 'tecnicatura', debes mapear inteligentemente 
-                las entradas del usuario a uno de los siguientes nombres EXACTOS:
-                - 'Desarrollo web' (mapear desde 'web', 'desarrollo', 'programacion')
-                - 'Administración de empresas' (mapear desde 'adm. de empresas', 'administracion', 'adm de empresas')
-                - 'Marketing' (mapear desde 'mkt', 'marketing digital')
-                - 'Higiene y seguridad' (mapear desde 'higiene', 'seguridad e higiene', 'higiene y seguridad')
-                - 'Gestión inmobiliaria' (mapear desde 'inmobiliaria', 'gestion')
-                - 'Analista de sistemas' (mapear desde 'analista', 'sistemas')
-                - 'Ciencia de datos e IA' (mapear desde 'datos', 'ia', 'ciencia de datos')
-                - 'Recursos humanos' (mapear desde 'rrhh', 'recursos')
-
-            3.  Campos Vacíos: Si no puedes encontrar un dato (nombre, email, telefono), 
-                devuelve '' (una cadena vacía) para ese campo.
-            4.  Tecnicatura Vacía: Si no puedes identificar una tecnicatura de la lista, 
-                devuelve '' (una cadena vacía).
-            5.  Teléfono: El teléfono debe incluir el prefijo si está presente.
+            1. Unificación: 'Nombre' + 'Apellido' -> 'nombre'.
+            2. Tecnicaturas: Mapea a: 'Desarrollo web', 'Administración de empresas', 'Marketing', 
+               'Higiene y seguridad', 'Gestión inmobiliaria', 'Analista de sistemas', 
+               'Ciencia de datos e IA', 'Recursos humanos'. Si no coincide, devuelve ''.
+            3. Vacíos: Si no hay dato, devuelve ''.
+            4. Teléfono: Incluye prefijos.
+            5. Preferencia: Analiza si dice "llamar", "telefono" -> 'Llamada'. Si dice "mensaje", "whatsapp" -> 'WhatsApp'. Sino 'Indiferente'.
         `;
 
-        // Esquema JSON para la IA (reutilizable)
         const jsonSchemaForGemini = {
             type: "OBJECT",
             properties: {
                 "nombre": { "type": "STRING" },
                 "email": { "type": "STRING" },
                 "telefono": { "type": "STRING" },
-                "tecnicatura": { "type": "STRING" }
+                "tecnicatura": { "type": "STRING" },
+                "preferencia_contacto": { 
+                    "type": "STRING", 
+                    "enum": ["WhatsApp", "Llamada", "Indiferente"] 
+                }
             }
         };
 
-        // --- Variables de Estado y Elementos del DOM ---
-        let db;
-        let auth;
-        let leadsCollectionRef;
-        let currentLeads = []; // Todos los leads de Firestore
-        let excelPreviewData = []; // Leads del Excel antes de confirmar
+        // --- Variables ---
+        let db, auth, leadsCollectionRef;
+        let currentLeads = [];
+        let excelPreviewData = [];
         let leadIdToDelete = null; 
         
-        // Elementos del DOM
-        const loader = document.getElementById('loader');
-        const messageBox = document.getElementById('messageBox');
-        const messageText = document.getElementById('messageText');
-        const closeMessageBtn = document.getElementById('closeMessageBtn');
-        const leadsTableBody = document.getElementById('leadsTableBody');
-
-        // Botones
-        const procesarBtn = document.getElementById('procesarBtn');
-        const procesarExcelBtn = document.getElementById('procesarExcelBtn');
-        const procesarImagenBtn = document.getElementById('procesarImagenBtn');
-        const descargarBtn = document.getElementById('descargarBtn');
-        const limpiarBtn = document.getElementById('limpiarBtn');
-
-        // Inputs
-        const mensajeInput = document.getElementById('mensajeInput');
-        const excelInput = document.getElementById('excelInput');
-        const imagenInput = document.getElementById('imagenInput');
-
-        // Modal de Limpieza General
-        const confirmModal = document.getElementById('confirmModal');
-        const confirmLimpiarBtn = document.getElementById('confirmLimpiarBtn');
-        const cancelLimpiarBtn = document.getElementById('cancelLimpiarBtn');
-        
-        // Modal de Eliminación Individual
-        const confirmDeleteOneModal = document.getElementById('confirmDeleteOneModal');
-        const confirmDeleteOneBtn = document.getElementById('confirmDeleteOneBtn');
-        const cancelDeleteOneBtn = document.getElementById('cancelDeleteOneBtn');
-        const deleteLeadName = document.getElementById('deleteLeadName');
-        
-        // Modal de Vista Previa de Excel
-        const excelPreviewModal = document.getElementById('excelPreviewModal');
-        const excelPreviewTableContainer = document.getElementById('excelPreviewTableContainer');
-        const confirmExcelCargaBtn = document.getElementById('confirmExcelCargaBtn');
-        const cancelExcelCargaBtn = document.getElementById('cancelExcelCargaBtn');
-
-
-        // --- Configuración de Firebase ---
+        // --- Firebase Init ---
         async function setupFirebase() {
             try {
-                // Configuración real de Firebase
                 const firebaseConfig = {
-                  apiKey: "AIzaSyClcQiTJj91vzb0P5737owh4tUyJPLWgEA",
-                  authDomain: "cargadeleads.firebaseapp.com",
-                  projectId: "cargadeleads",
-                  storageBucket: "cargadeleads.firebasestorage.app", 
-                  messagingSenderId: "744616190679",
-                  appId: "1:744616190679:web:af63cbf7b42ee455a30692",
-                  measurementId: "G-Y40TM1HJ02"
+                    apiKey: "AIzaSyClcQiTJj91vzb0P5737owh4tUyJPLWgEA",
+                    authDomain: "cargadeleads.firebaseapp.com",
+                    projectId: "cargadeleads",
+                    storageBucket: "cargadeleads.firebasestorage.app", 
+                    messagingSenderId: "744616190679",
+                    appId: "1:744616190679:web:af63cbf7b42ee455a30692",
+                    measurementId: "G-Y40TM1HJ02"
                 };
                 
-                if (!firebaseConfig.apiKey) {
-                    showMessage("La configuración de Firebase no está disponible. La persistencia de datos no funcionará.", true);
-                    loader.classList.add('hidden');
-                    return;
-                }
+                if (!firebaseConfig.apiKey) throw new Error("Sin API Key de Firebase");
 
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
-                setLogLevel('Debug');
 
                 await signInAnonymously(auth);
-                console.log("Usuario autenticado (anónimo):", auth.currentUser?.uid);
-                
                 const collectionPath = `leads`; 
                 leadsCollectionRef = collection(db, collectionPath);
                 listenToAllLeads();
             } catch (err) {
-                console.error("Error inicializando Firebase:", err);
-                showMessage(`Error de Firebase: ${err.message}`, true);
-                loader.classList.add('hidden');
+                console.error("Firebase Error:", err);
+                window.showMessage(`Error conectando base de datos: ${err.message}`, true);
+                document.getElementById('loader').classList.add('hidden');
             }
         }
 
-        // --- Lógica de Firestore ---
+        // --- Core Logic ---
 
         function listenToAllLeads() {
-            if (!leadsCollectionRef) return; // Guard contra inicialización tardía
+            if (!leadsCollectionRef) return;
             const q = query(leadsCollectionRef);
             onSnapshot(q, (snapshot) => {
                 currentLeads = [];
@@ -183,218 +187,38 @@
                 });
                 currentLeads.sort((a, b) => b.fechaCreacionTimestamp - a.fechaCreacionTimestamp);
                 renderTable();
-                const hasLeads = currentLeads.length > 0;
-                descargarBtn.disabled = !hasLeads;
-                descargarBtn.classList.toggle('opacity-50', !hasLeads);
-                limpiarBtn.disabled = !hasLeads;
-                limpiarBtn.classList.toggle('opacity-50', !hasLeads);
-            }, (err) => {
-                console.error("Error al escuchar leads:", err);
-                showMessage(`Error de Firestore: ${err.message}`, true);
-            });
-        }
-
-        async function saveLeadToFirestore(leadData) {
-            try {
-                const { id, ...dataToSave } = leadData;
-                await addDoc(leadsCollectionRef, dataToSave);
-            } catch (err) {
-                console.error("Error al guardar lead:", err);
-                showMessage(`Error al guardar en base de datos: ${err.message}`, true);
-            }
-        }
-
-        // --- Lógica de Limpieza ---
-
-        function handleLimpiarClick() {
-            confirmModal.classList.remove('hidden');
-        }
-
-        function hideConfirmModal() {
-            confirmModal.classList.add('hidden');
-        }
-
-        async function confirmLimpiarDatos() {
-            hideConfirmModal();
-            showLoader(true);
-            try {
-                if (!leadsCollectionRef) throw new Error("La base de datos no está lista.");
-                const querySnapshot = await getDocs(leadsCollectionRef);
-                const deletePromises = querySnapshot.docs.map(docSnapshot => 
-                    deleteDoc(doc(leadsCollectionRef, docSnapshot.id)) // Usar referencia de colección
-                );
-                await Promise.all(deletePromises);
-                showMessage("Todos los leads han sido eliminados.", false);
-            } catch (err) {
-                console.error("Error al limpiar los datos:", err);
-                showMessage(`Error al limpiar la base de datos: ${err.message}`, true);
-            } finally {
-                showLoader(false);
-            }
-        }
-        
-        // --- Lógica de Eliminación Individual ---
-
-        function handleDeleteClick(event) {
-            const deleteButton = event.target.closest('.delete-btn');
-            if (deleteButton) {
-                leadIdToDelete = deleteButton.dataset.id;
-                const leadName = deleteButton.dataset.name || "este lead";
-                deleteLeadName.textContent = leadName;
-                confirmDeleteOneModal.classList.remove('hidden');
-            }
-        }
-
-        function hideDeleteOneModal() {
-            confirmDeleteOneModal.classList.add('hidden');
-            leadIdToDelete = null;
-        }
-
-        async function confirmDeleteOneLead() {
-            // *** CORRECCIÓN ***: Añadida verificación de leadsCollectionRef
-            if (!leadIdToDelete || !leadsCollectionRef) {
-                showMessage("Error: No se pudo encontrar la referencia del lead. Inténtalo de nuevo.", true);
-                hideDeleteOneModal();
-                return;
-            }
-            
-            hideDeleteOneModal();
-            showLoader(true);
-            try {
-                await deleteDoc(doc(leadsCollectionRef, leadIdToDelete));
-                showMessage("Lead eliminado correctamente.", false);
-            } catch (err) {
-                console.error("Error al eliminar el lead:", err);
-                showMessage(`Error al eliminar el lead: ${err.message}`, true);
-            } finally {
-                leadIdToDelete = null;
-                showLoader(false);
-            }
-        }
-
-
-        // --- Lógica de la Interfaz (UI) ---
-
-        function renderTable() {
-            leadsTableBody.innerHTML = '';
-            const totalColumns = excelHeaders.length + 1;
-            
-            if (currentLeads.length === 0) {
-                leadsTableBody.innerHTML = `<tr><td colspan="${totalColumns}" class="text-center text-gray-500 p-4">No hay leads cargados.</td></tr>`;
-                return;
-            }
-            
-            currentLeads.forEach(lead => {
-                const tr = document.createElement('tr');
-                tr.className = 'bg-white border-b hover:bg-gray-50';
                 
-                tr.innerHTML = `
-                    <td class="p-3 text-xs text-gray-700 font-mono" title="${lead.id}">${lead.id.substring(0, 5)}...</td>
-                    <td class="p-3 text-sm text-gray-900">${lead.nombreCompleto}</td>
-                    <td class="p-3 text-sm text-gray-900">${lead.email}</td>
-                    <td class="p-3 text-sm text-gray-900">${lead.telefono}</td>
-                    <td class="p-3 text-sm text-gray-900">${tecnicaturaNameMap[lead.tecnicaturaId] || ''}</td>
-                    <td class="p-3"><span class="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">${lead.estado}</span></td>
-                    <td class="p-3 text-sm text-gray-900">${lead.vendedorAsignado}</td>
-                    <td class="p-3 text-sm text-gray-900">${lead.fechaCreacion}</td>
-                    <td class="p-3 text-sm text-gray-900">${lead.ultimoContacto}</td>
-                    <td class="p-3 text-sm text-gray-900">${lead.observaciones}</td>
-                    <td class="p-3 text-center">
-                        <button type="button" class="delete-btn text-red-500 hover:text-red-700" 
-                                data-id="${lead.id}" data-name="${lead.nombreCompleto}">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                        </button>
-                    </td>
-                `;
-                leadsTableBody.appendChild(tr);
-            });
-        }
-
-        function showLoader(show) {
-            loader.classList.toggle('hidden', !show);
-            const buttons = [procesarBtn, limpiarBtn, procesarExcelBtn, procesarImagenBtn, descargarBtn];
-            buttons.forEach(btn => {
-                if(btn) {
-                    btn.disabled = show;
-                    btn.classList.toggle('opacity-50', show);
+                const hasLeads = currentLeads.length > 0;
+                const descargarBtn = document.getElementById('descargarBtn');
+                const limpiarBtn = document.getElementById('limpiarBtn');
+                
+                if(descargarBtn) {
+                    descargarBtn.disabled = !hasLeads;
+                    descargarBtn.style.opacity = hasLeads ? "1" : "0.5";
+                }
+                if(limpiarBtn) {
+                    limpiarBtn.disabled = !hasLeads;
+                    limpiarBtn.style.opacity = hasLeads ? "1" : "0.5";
                 }
             });
-            if (!show && currentLeads.length > 0) {
-                descargarBtn.disabled = false;
-                descargarBtn.classList.remove('opacity-50');
-                limpiarBtn.disabled = false;
-                limpiarBtn.classList.remove('opacity-50');
-            }
         }
 
-        function showMessage(message, isError = true) {
-            messageText.textContent = message;
-            messageBox.classList.toggle('bg-red-100', isError);
-            messageBox.classList.toggle('border-red-400', isError);
-            messageBox.classList.toggle('text-red-700', isError);
-            messageBox.classList.toggle('bg-green-100', !isError);
-            messageBox.classList.toggle('border-green-400', !isError);
-            messageBox.classList.toggle('text-green-700', !isError);
-            messageBox.classList.remove('hidden');
-        }
-
-        function hideMessage() {
-            messageBox.classList.add('hidden');
-        }
-
-        // --- *** NUEVO *** Verificador de Duplicados ---
-        /**
-         * Verifica si un lead ya existe en 'currentLeads' basado en email o teléfono.
-         * Devuelve un mensaje de error si es duplicado, o null si no lo es.
-         */
         function checkIfLeadExists(email, phone) {
             const newEmail = email ? email.trim() : '';
             const newPhone = phone ? phone.trim() : '';
-
-            // No hacer nada si ambos están vacíos (permitir guardar)
-            if (!newEmail && !newPhone) {
-                return null;
-            }
-
-            if (newEmail) {
-                const emailExists = currentLeads.some(lead => lead.email === newEmail);
-                if (emailExists) {
-                    return `Este lead ya existe (Email: ${newEmail}).`;
-                }
-            }
-            if (newPhone) {
-                const phoneExists = currentLeads.some(lead => lead.telefono === newPhone);
-                if (phoneExists) {
-                    return `Este lead ya existe (Teléfono: ${newPhone}).`;
-                }
-            }
-            return null; // No es duplicado
+            if (!newEmail && !newPhone) return null;
+            if (newEmail && currentLeads.some(lead => lead.email === newEmail)) return `Email existente: ${newEmail}`;
+            if (newPhone && currentLeads.some(lead => lead.telefono === newPhone)) return `Teléfono existente: ${newPhone}`;
+            return null;
         }
 
-
-        // --- Lógica Central de Procesamiento ---
-        
-        /**
-         * Procesa y guarda un lead, ahora con verificación de duplicados.
-         * @param {object} parsedData - Los datos parseados por la IA.
-         * @param {boolean} showDuplicateMessage - Si debe mostrar un mensaje de error en caso de duplicado.
-         * @returns {boolean} - true si se guardó, false si no.
-         */
         async function processAndSaveLead(parsedData, showDuplicateMessage = false) {
-            if (!parsedData) {
-                return false;
-            }
+            if (!parsedData) return false;
             
-            // *** NUEVO ***: Verificación de duplicados
             const duplicateError = checkIfLeadExists(parsedData.email, parsedData.telefono);
             if (duplicateError) {
-                if (showDuplicateMessage) { // Mostrar solo en cargas manuales
-                    showMessage(duplicateError, true);
-                }
-                console.warn(`Omitiendo lead duplicado: ${duplicateError}`);
-                return false; // No guardar
+                if (showDuplicateMessage) window.showMessage(duplicateError, true);
+                return false;
             }
             
             try {
@@ -404,6 +228,11 @@
                 const fechaFormateada = new Date(timestamp).toLocaleDateString('es-AR', {
                     day: '2-digit', month: '2-digit', year: 'numeric'
                 });
+
+                let observacionesFinal = '';
+                if (parsedData.preferencia_contacto && parsedData.preferencia_contacto !== 'Indiferente') {
+                    observacionesFinal = `Prefiere: ${parsedData.preferencia_contacto}`;
+                }
 
                 const newLead = {
                     id: '',
@@ -416,560 +245,433 @@
                     fechaCreacion: fechaFormateada,
                     fechaCreacionTimestamp: timestamp,
                     ultimoContacto: '',
-                    observaciones: ''
+                    observaciones: observacionesFinal 
                 };
-                await saveLeadToFirestore(newLead);
+                
+                const { id, ...dataToSave } = newLead;
+                await addDoc(leadsCollectionRef, dataToSave);
                 return true;
             } catch (err) {
-                console.error("Error en processAndSaveLead:", err.message);
+                console.error("Save Error:", err);
                 return false;
             }
         }
 
-        // --- Manejador de "Procesar Texto" ---
-        async function handleProcesarClick() {
-            const mensaje = mensajeInput.value;
-            if (!mensaje.trim()) {
-                showMessage("El mensaje no puede estar vacío.", true);
-                return;
-            }
-            hideMessage();
-            showLoader(true);
-            
+        // --- Handlers y Funciones Globales ---
+        
+        // Exponer funciones al window para que el HTML onclick funcione
+        window.showMessage = (msg, isError) => {
+            const messageText = document.getElementById('messageText');
+            const messageBox = document.getElementById('messageBox');
+            messageText.textContent = msg;
+            messageBox.className = `glass-panel rounded-xl p-4 mb-6 flex justify-between items-center ${isError ? 'border-red-400/50 text-red-100 bg-red-900/30' : 'border-green-400/50 text-green-100 bg-green-900/30'}`;
+            messageBox.classList.remove('hidden');
+        };
+
+        window.hideMessage = () => { 
+            document.getElementById('messageBox').classList.add('hidden'); 
+        };
+
+        window.showLoader = (show) => { 
+            document.getElementById('loader').classList.toggle('hidden', !show); 
+        };
+
+        window.confirmLimpiarDatos = async () => {
+            document.getElementById('confirmModal').classList.add('hidden'); 
+            window.showLoader(true);
             try {
-                const parsedData = await parseMessageWithGemini(mensaje);
-                // *** CAMBIO ***: Pasa 'true' para mostrar error de duplicado
-                const success = await processAndSaveLead(parsedData, true); 
-                
-                if (success) {
-                    mensajeInput.value = '';
-                    showMessage("Lead agregado correctamente.", false);
-                } else if (!checkIfLeadExists(parsedData.email, parsedData.telefono)) {
-                    // Si 'success' es falso, pero NO es por un duplicado, mostrar error genérico.
-                    showMessage("No se pudo procesar el lead. Revisa el texto.", true);
-                }
-            } catch (err) {
-                 showMessage(`Error de IA: ${err.message}`, true);
+                const snapshot = await getDocs(leadsCollectionRef);
+                const deletePromises = snapshot.docs.map(d => deleteDoc(doc(leadsCollectionRef, d.id)));
+                await Promise.all(deletePromises);
+                window.showMessage("Base de datos limpiada.", false);
+            } catch (e) {
+                window.showMessage("Error al limpiar: " + e.message, true);
             } finally {
-                // *** CORRECCIÓN ***: Mover showLoader a 'finally'
-                showLoader(false);
+                window.showLoader(false);
             }
-        }
+        };
 
-        // --- Lógica de Carga de Imagen ---
-
-        function handleImageUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            processImageFile(file);
-            event.target.value = null; 
-        }
-
-        function handlePaste(event) {
-            const items = (event.clipboardData || window.clipboardData).items;
-            for (let i = 0; i < items.length; i++) {
-                if (items[i].kind === 'file' && items[i].type.startsWith('image/')) {
-                    event.preventDefault(); 
-                    const file = items[i].getAsFile();
-                    processImageFile(file); 
-                    return; 
-                }
-            }
-        }
-
-        async function processImageFile(file) {
-            if (!file) return;
-            hideMessage();
-            showLoader(true);
-            showMessage("Procesando imagen (OCR)... esto puede tardar.", false);
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                try {
-                    const base64DataUrl = e.target.result;
-                    const base64Data = base64DataUrl.split(',')[1];
-                    const parsedData = await parseImageWithGemini(base64Data, file.type);
-                    
-                    // *** CAMBIO ***: Pasa 'true' para mostrar error de duplicado
-                    const success = await processAndSaveLead(parsedData, true);
-
-                    if (success) {
-                        showMessage("Lead extraído de la imagen y agregado.", false);
-                    } else if (!checkIfLeadExists(parsedData.email, parsedData.telefono)) {
-                        showMessage("No se pudo procesar la imagen. Intenta con una captura más clara.", true);
-                    }
-                } catch (err) {
-                    console.error("Error procesando imagen:", err);
-                    showMessage(`Error al procesar imagen: ${err.message}`, true);
-                } finally {
-                    showLoader(false);
-                }
-            };
-            reader.onerror = () => {
-                showMessage("Error al leer el archivo de imagen.", true);
-                showLoader(false);
-            };
-            reader.readAsDataURL(file);
-        }
-
-        // --- Lógica de Carga de Excel ---
-
-        function handleExcelUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            hideMessage();
-            showLoader(true);
-            showMessage("Procesando archivo Excel para vista previa...", false);
-            excelPreviewData = []; 
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                try {
-                    const data = e.target.result;
-                    const workbook = window.XLSX.read(data, { type: 'array' });
-                    const sheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[sheetName];
-                    const jsonRows = window.XLSX.utils.sheet_to_json(worksheet);
-                    if (jsonRows.length === 0) throw new Error("El Excel está vacío.");
-                    for (const [index, row] of jsonRows.entries()) {
-                        const textRow = Object.entries(row).map(([key, value]) => `${key}: ${value}`).join(', ');
-                        const parsedData = await parseMessageWithGemini(textRow);
-                        excelPreviewData.push({ 
-                            tempId: index,
-                            ...parsedData 
-                        });
-                    }
-                    renderExcelPreviewTable();
-                    excelPreviewModal.classList.remove('hidden');
-                    showMessage(`Vista previa generada. ${excelPreviewData.length} filas detectadas.`, false);
-                } catch (err) {
-                    console.error("Error leyendo el Excel:", err);
-                    showMessage(`Error al procesar el Excel: ${err.message}`, true);
-                } finally {
-                    showLoader(false);
-                    event.target.value = null;
-                }
-            };
-            reader.onerror = () => {
-                showMessage("Error al leer el archivo.", true);
-                showLoader(false);
-                event.target.value = null;
-            };
-            reader.readAsArrayBuffer(file);
-        }
-
-        function renderExcelPreviewTable() {
-            excelPreviewTableContainer.innerHTML = '';
-            const table = document.createElement('table');
-            table.className = 'w-full min-w-max text-left text-sm';
-            table.innerHTML = `
-                <thead class="text-xs text-gray-700 uppercase bg-gray-50">
-                    <tr>
-                        <th class="p-3">Nombre</th>
-                        <th class="p-3">Email</th>
-                        <th class="p-3">Teléfono</th>
-                        <th class="p-3">Tecnicatura (Detectada)</th>
-                    </tr>
-                </thead>
-                <tbody>
-                </tbody>
-            `;
-            const tbody = table.querySelector('tbody');
-            const tecnicaturaOptions = Object.keys(tecnicaturaMap)
-                .map(nombre => `<option value="${nombre}">${nombre}</option>`)
-                .join('');
-            excelPreviewData.forEach(row => {
-                const tr = document.createElement('tr');
-                tr.className = 'bg-white border-b';
-                tr.innerHTML = `
-                    <td class="p-2">
-                        <input type="text" data-id="${row.tempId}" data-field="nombre" value="${row.nombre || ''}" 
-                               class="w-full p-2 border rounded-md">
-                    </td>
-                    <td class="p-2">
-                        <input type="email" data-id="${row.tempId}" data-field="email" value="${row.email || ''}" 
-                               class="w-full p-2 border rounded-md">
-                    </td>
-                    <td class="p-2">
-                        <input type="tel" data-id="${row.tempId}" data-field="telefono" value="${row.telefono || ''}" 
-                               class="w-full p-2 border rounded-md">
-                    </td>
-                    <td class="p-2">
-                        <select data-id="${row.tempId}" data-field="tecnicatura" 
-                                class="w-full p-2 border rounded-md bg-white">
-                            <option value="">-- Seleccionar --</option>
-                            ${tecnicaturaOptions}
-                        </select>
-                    </td>
-                `;
-                const select = tr.querySelector('select');
-                select.value = row.tecnicatura || '';
-                tr.querySelectorAll('input, select').forEach(el => {
-                    el.addEventListener('change', (e) => updatePreviewData(e.target.dataset.id, e.target.dataset.field, e.target.value));
-                });
-                tbody.appendChild(tr);
-            });
-            excelPreviewTableContainer.appendChild(table);
-        }
-
-        function updatePreviewData(tempId, field, value) {
-            const index = excelPreviewData.findIndex(row => row.tempId == tempId);
-            if (index !== -1) {
-                excelPreviewData[index][field] = value;
-            }
-        }
-
-        function hideExcelPreviewModal() {
-            excelPreviewModal.classList.add('hidden');
-            excelPreviewData = [];
-        }
-
-        async function confirmExcelCarga() {
-            hideExcelPreviewModal();
-            showLoader(true);
-            showMessage(`Guardando ${excelPreviewData.length} leads del Excel...`, false);
-            let successCount = 0;
-            let errorCount = 0;
-            for (const parsedRow of excelPreviewData) {
-                // *** CAMBIO ***: Pasa 'false' para NO mostrar error de duplicado por cada fila
-                const success = await processAndSaveLead(parsedRow, false); 
-                if (success) successCount++;
-                else errorCount++;
-            }
-            // *** CAMBIO ***: Mensaje de finalización actualizado
-            showMessage(`Carga de Excel completada: ${successCount} guardados, ${errorCount} omitidos (duplicados o fallidos).`, errorCount > 0);
-            excelPreviewData = [];
-            showLoader(false);
-        }
-
-
-        // --- Llamadas a la API de Gemini ---
+        window.deleteSingleLead = async () => {
+             document.getElementById('confirmDeleteOneModal').classList.add('hidden');
+             if(!leadIdToDelete) return;
+             
+             window.showLoader(true);
+             try {
+                // Forzamos la eliminación usando la referencia directa
+                const docRef = doc(db, 'leads', leadIdToDelete); // Usamos db y path explícito para seguridad
+                await deleteDoc(docRef);
+                window.showMessage("Lead eliminado correctamente.", false);
+             } catch(e) {
+                 console.error(e);
+                 window.showMessage("Error al eliminar: " + e.message, true);
+             } finally {
+                 window.showLoader(false);
+                 leadIdToDelete = null;
+             }
+        };
+        
+        // --- IA Calls ---
 
         async function parseMessageWithGemini(text) {
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`;
             const payload = {
                 contents: [{ parts: [{ text: text }] }],
                 systemInstruction: { parts: [{ text: systemPromptForGemini }] },
-                generationConfig: {
-                    responseMimeType: "application/json",
-                    responseSchema: jsonSchemaForGemini
-                }
+                generationConfig: { responseMimeType: "application/json", responseSchema: jsonSchemaForGemini }
             };
             return await makeGeminiApiCall(apiUrl, payload);
         }
 
         async function parseImageWithGemini(base64Data, mimeType) {
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`;
-            const userPromptForImage = `
-                Extrae el nombre, email, teléfono y la tecnicatura de esta imagen, que es una captura de pantalla de una conversación.
-                Importante: Primero, busca un número de teléfono en la parte SUPERIOR de la captura (el contacto de WhatsApp). 
-                Si lo encuentras, úsalo como el 'telefono'. Si no, busca el teléfono en el texto de la conversación.
-            `;
+            const userPromptForImage = `Analiza esta imagen. Extrae datos y busca explícitamente si el usuario prefiere WhatsApp o Llamada.`;
             const payload = {
-                contents: [
-                    { 
-                        role: "user", 
-                        parts: [
-                            { text: userPromptForImage }, 
-                            { inlineData: { mimeType: mimeType, data: base64Data } }
-                        ]
-                    }
-                ],
+                contents: [{ 
+                    role: "user", 
+                    parts: [{ text: userPromptForImage }, { inlineData: { mimeType: mimeType, data: base64Data } }] 
+                }],
                 systemInstruction: { parts: [{ text: systemPromptForGemini }] },
-                generationConfig: {
-                    responseMimeType: "application/json",
-                    responseSchema: jsonSchemaForGemini
-                }
+                generationConfig: { responseMimeType: "application/json", responseSchema: jsonSchemaForGemini }
             };
             return await makeGeminiApiCall(apiUrl, payload);
         }
 
         async function makeGeminiApiCall(apiUrl, payload) {
-            let response;
-            let delay = 1000;
-            for (let i = 0; i < 3; i++) {
-                try {
-                    response = await fetch(apiUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                    if (response.status === 429 || response.status >= 500) {
-                        await new Promise(resolve => setTimeout(resolve, delay));
-                        delay *= 2;
-                        continue;
-                    }
-                    if (!response.ok) {
-                         const errorBody = await response.text();
-                         throw new Error(`Error de API: ${response.status} ${response.statusText}. Cuerpo: ${errorBody}`);
-                    }
-                    break;
-                } catch (err) {
-                    if (i === 2) throw err;
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                    delay *= 2;
-                }
-            }
-            if (!response) {
-                throw new Error("No se pudo obtener respuesta de la API después de 3 intentos.");
-            }
+            const response = await fetch(apiUrl, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+            });
+            if (!response.ok) throw new Error(response.statusText);
             const result = await response.json();
-            const candidate = result.candidates?.[0];
-            if (candidate && candidate.content?.parts?.[0]?.text) {
-                try {
-                    const jsonText = candidate.content.parts[0].text;
-                    return JSON.parse(jsonText);
-                } catch (e) {
-                    console.error("Error al parsear JSON de la IA:", e);
-                    throw new Error("La IA devolvió un formato inesperado.");
-                }
-            } else {
-                console.error("Respuesta inesperada de la API:", result);
-                if(result.error) {
-                    throw new Error(`Error de la API de Google: ${result.error.message}`);
-                }
-                throw new Error("No se pudo obtener una respuesta válida de la IA.");
-            }
+            return JSON.parse(result.candidates[0].content.parts[0].text);
         }
 
-        // --- Función Helper para Email de Excel ---
-        function generateDummyEmail(lead) {
-            const name = lead.nombreCompleto;
-            if (name) {
-                try {
-                    const cleanName = name
-                        .toLowerCase()
-                        .normalize("NFD") 
-                        .replace(/[\u0300-\u036f]/g, "") 
-                        .replace(/[^a-z0-9\s]/g, '') 
-                        .trim()
-                        .replace(/\s+/g, '.'); 
-                    
-                    if (cleanName === "" || cleanName === ".") {
-                        return `${lead.fechaCreacionTimestamp}@cervantes.edu.ar`;
-                    }
-                    
-                    return `${cleanName}@cervantes.edu.ar`;
-                } catch (err) {
-                    console.error("Error generando email ficticio desde nombre, usando timestamp:", err);
-                    return `${lead.fechaCreacionTimestamp}@cervantes.edu.ar`;
-                }
-            }
-            return `${lead.fechaCreacionTimestamp}@cervantes.edu.ar`;
-        }
-
-
-        // --- Lógica de Exportación a Excel ---
-
-        function handleDescargarClick() {
+        // --- Table Render ---
+        function renderTable() {
+            const leadsTableBody = document.getElementById('leadsTableBody');
+            leadsTableBody.innerHTML = '';
             if (currentLeads.length === 0) {
-                showMessage("No hay datos para descargar.", true);
+                leadsTableBody.innerHTML = `<tr><td colspan="10" class="text-center p-8 text-white/50">Sin leads cargados.</td></tr>`;
                 return;
             }
-
-            if (typeof window.XLSX === 'undefined') {
-                showMessage("La librería de Excel (XLSX) no se ha cargado. Revisa tu conexión o recarga la página.", true);
-                console.error("Error: La librería window.XLSX no está definida.");
-                return;
-            }
-
-            const dataForExcel = currentLeads.map(lead => {
-                const email = lead.email || generateDummyEmail(lead); 
+            currentLeads.forEach(lead => {
+                const tr = document.createElement('tr');
+                tr.className = 'glass-row border-b border-white/10 transition duration-200';
                 
-                return {
-                    'ID': '',
-                    'Nombre Completo': lead.nombreCompleto,
-                    'Email': email,
-                    'Teléfono': lead.telefono,
-                    'Tecnicatura': lead.tecnicaturaId,
-                    'Estado': lead.estado,
-                    'Vendedor Asignado': lead.vendedorAsignado,
-                    'Fecha de Creación': lead.fechaCreacion,
-                    'Último Contacto': lead.ultimoContacto,
-                    'Observaciones': lead.observaciones
-                };
+                let badgeClass = 'bg-gray-100/20 text-gray-200';
+                if(lead.estado === 'sin_contacto') badgeClass = 'bg-yellow-500/20 text-yellow-200 border border-yellow-500/30';
+                
+                let obsHtml = lead.observaciones || '-';
+                if(lead.observaciones && lead.observaciones.includes('WhatsApp')) {
+                    obsHtml = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-green-500/20 text-green-300 text-xs border border-green-500/30">📱 WPP</span>`;
+                } else if (lead.observaciones && lead.observaciones.includes('Llamada')) {
+                    obsHtml = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 text-xs border border-blue-500/30">📞 Call</span>`;
+                }
+
+                tr.innerHTML = `
+                    <td class="p-4 text-xs font-mono text-white/60">${lead.id.substring(0, 4)}</td>
+                    <td class="p-4 font-medium text-white">${lead.nombreCompleto}</td>
+                    <td class="p-4 text-white/80">${lead.email}</td>
+                    <td class="p-4 text-white/80">${lead.telefono}</td>
+                    <td class="p-4 text-white/80">${tecnicaturaNameMap[lead.tecnicaturaId] || '-'}</td>
+                    <td class="p-4"><span class="px-2 py-1 text-xs rounded-full ${badgeClass}">${lead.estado}</span></td>
+                    <td class="p-4 text-white/80">${lead.vendedorAsignado}</td>
+                    <td class="p-4 text-xs text-white/60">${lead.fechaCreacion}</td>
+                    <td class="p-4 text-sm">${obsHtml}</td>
+                    <td class="p-4 text-center">
+                        <button class="delete-btn text-red-300 hover:text-red-100 p-1 hover:bg-red-500/20 rounded transition" 
+                                data-id="${lead.id}" data-name="${lead.nombreCompleto}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                    </td>
+                `;
+                leadsTableBody.appendChild(tr);
+            });
+        }
+
+        // --- Event Listeners Setup ---
+        
+        async function processImageFile(file) {
+            if(!file) return;
+            window.showLoader(true);
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const parsed = await parseImageWithGemini(e.target.result.split(',')[1], file.type);
+                    const success = await processAndSaveLead(parsed, true);
+                    if(success) window.showMessage(`Imagen procesada. Prefiere: ${parsed.preferencia_contacto}`, false);
+                    else window.showMessage("Error o duplicado.", true);
+                } catch(err) { window.showMessage(err.message, true); }
+                window.showLoader(false);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function handleExcelUpload(file) {
+             if(!file) return;
+             window.showLoader(true);
+             const reader = new FileReader();
+             reader.onload = async (e) => {
+                const wb = window.XLSX.read(e.target.result, {type:'array'});
+                const jsonRows = window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                excelPreviewData = [];
+                for(let [idx, row] of jsonRows.entries()) {
+                    const text = Object.entries(row).map(([k,v])=>`${k}:${v}`).join(', ');
+                    const parsed = await parseMessageWithGemini(text);
+                    excelPreviewData.push({tempId: idx, ...parsed});
+                }
+                renderExcelPreview();
+                document.getElementById('excelPreviewModal').classList.remove('hidden');
+                window.showLoader(false);
+             };
+             reader.readAsArrayBuffer(file);
+        }
+
+        function renderExcelPreview() {
+            const container = document.getElementById('excelPreviewTableContainer');
+            container.innerHTML = '';
+            
+            const table = document.createElement('table');
+            table.className = 'w-full text-left text-sm text-white';
+            table.innerHTML = `
+                <thead class="glass-table-header uppercase text-xs">
+                    <tr><th class="p-3">Nombre</th><th class="p-3">Email</th><th class="p-3">Preferencia</th></tr>
+                </thead>
+                <tbody class="divide-y divide-white/10"></tbody>
+            `;
+            const tbody = table.querySelector('tbody');
+            
+            excelPreviewData.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="p-2"><input class="glass-input w-full p-2 rounded" value="${row.nombre||''}" onchange="updateExcelData(${row.tempId}, 'nombre', this.value)"></td>
+                    <td class="p-2"><input class="glass-input w-full p-2 rounded" value="${row.email||''}" onchange="updateExcelData(${row.tempId}, 'email', this.value)"></td>
+                    <td class="p-2 text-white/70">${row.preferencia_contacto || '-'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            container.appendChild(table);
+        }
+        
+        window.updateExcelData = (id, field, val) => {
+            const row = excelPreviewData.find(r => r.tempId === id);
+            if(row) row[field] = val;
+        };
+
+        // DOM Loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            setupFirebase();
+            
+            // Buttons
+            document.getElementById('procesarBtn').addEventListener('click', async () => {
+                const mensajeInput = document.getElementById('mensajeInput');
+                const mensaje = mensajeInput.value;
+                if (!mensaje.trim()) { window.showMessage("Escribe algo primero.", true); return; }
+                window.hideMessage(); window.showLoader(true);
+                try {
+                    const parsedData = await parseMessageWithGemini(mensaje);
+                    const success = await processAndSaveLead(parsedData, true);
+                    if (success) {
+                        mensajeInput.value = '';
+                        window.showMessage(`Lead agregado. Preferencia detectada: ${parsedData.preferencia_contacto}`, false);
+                    } else if (!checkIfLeadExists(parsedData.email, parsedData.telefono)) {
+                        window.showMessage("No se pudo procesar. Intenta ser más claro.", true);
+                    }
+                } catch (err) { window.showMessage(`Error IA: ${err.message}`, true); }
+                finally { window.showLoader(false); }
+            });
+
+            document.getElementById('limpiarBtn').addEventListener('click', () => {
+                document.getElementById('confirmModal').classList.remove('hidden');
             });
             
-            const ws = window.XLSX.utils.json_to_sheet(dataForExcel, { header: excelHeaders });
-            const wb = window.XLSX.utils.book_new();
-            window.XLSX.utils.book_append_sheet(wb, ws, "Leads");
-            const todayStr = new Date().toISOString().split('T')[0];
-            window.XLSX.writeFile(wb, `leads_export_${todayStr}.xlsx`);
-        }
+            document.getElementById('confirmDeleteOneBtn').addEventListener('click', window.deleteSingleLead);
 
-        // --- Inicialización ---
-        document.addEventListener('DOMContentLoaded', () => {
-            // Botones de acción principal
-            procesarBtn.addEventListener('click', handleProcesarClick);
-            descargarBtn.addEventListener('click', handleDescargarClick);
-            limpiarBtn.addEventListener('click', handleLimpiarClick);
-            
-            // Botones de carga de archivos
-            procesarExcelBtn.addEventListener('click', () => excelInput.click());
-            procesarImagenBtn.addEventListener('click', () => imagenInput.click()); 
+            document.getElementById('confirmExcelCargaBtn').onclick = async () => {
+                document.getElementById('excelPreviewModal').classList.add('hidden'); 
+                window.showLoader(true);
+                let count = 0;
+                for(let row of excelPreviewData) { if(await processAndSaveLead(row, false)) count++; }
+                window.showMessage(`Cargados ${count} leads.`, false);
+                window.showLoader(false);
+            };
 
-            // Inputs de archivo
-            excelInput.addEventListener('change', handleExcelUpload);
-            imagenInput.addEventListener('change', handleImageUpload);
-            
-            // Listener de pegado (para imágenes)
-            mensajeInput.addEventListener('paste', handlePaste);
+            document.getElementById('descargarBtn').onclick = () => {
+                 const ws = window.XLSX.utils.json_to_sheet(currentLeads.map(l => ({
+                     Nombre: l.nombreCompleto, Email: l.email, Obs: l.observaciones
+                 })));
+                 const wb = window.XLSX.utils.book_new();
+                 window.XLSX.utils.book_append_sheet(wb, ws, "Leads");
+                 window.XLSX.writeFile(wb, "leads_glass.xlsx");
+            };
 
-            // Controles del modal de limpieza general
-            confirmLimpiarBtn.addEventListener('click', confirmLimpiarDatos);
-            cancelLimpiarBtn.addEventListener('click', hideConfirmModal);
+            // Files & Paste
+            const mensajeInput = document.getElementById('mensajeInput');
+            mensajeInput.addEventListener('paste', (e) => {
+                const items = (e.clipboardData || window.clipboardData).items;
+                for (let i = 0; i < items.length; i++) {
+                    if (items[i].kind === 'file' && items[i].type.startsWith('image/')) {
+                        e.preventDefault();
+                        window.showMessage("Imagen detectada en portapapeles. Procesando...", false);
+                        processImageFile(items[i].getAsFile());
+                        return; // Detener para solo procesar la primera imagen
+                    }
+                }
+            });
+
+            document.getElementById('imagenInput').addEventListener('change', (e) => processImageFile(e.target.files[0]));
+            document.getElementById('excelInput').addEventListener('change', (e) => handleExcelUpload(e.target.files[0]));
+
+            // Global delegation for delete buttons
+            document.addEventListener('click', (e) => {
+                const btn = e.target.closest('.delete-btn');
+                if(btn) {
+                    leadIdToDelete = btn.dataset.id;
+                    const name = btn.dataset.name;
+                    document.getElementById('deleteLeadName').textContent = name || 'este lead';
+                    document.getElementById('confirmDeleteOneModal').classList.remove('hidden');
+                }
+            });
             
-            // Controles del modal de eliminación individual
-            confirmDeleteOneBtn.addEventListener('click', confirmDeleteOneLead);
-            cancelDeleteOneBtn.addEventListener('click', hideDeleteOneModal);
-            
-            // Listener de clic en la tabla para delegación de eventos
-            leadsTableBody.addEventListener('click', handleDeleteClick);
-            
-            // Controles del modal de vista previa de Excel
-            confirmExcelCargaBtn.addEventListener('click', confirmExcelCarga);
-            cancelExcelCargaBtn.addEventListener('click', hideExcelPreviewModal);
-            
-            closeMessageBtn.addEventListener('click', hideMessage);
-            
-            setupFirebase();
+            // Close Modals
+            document.querySelectorAll('.close-modal').forEach(b => b.onclick = () => {
+                b.closest('.fixed').classList.add('hidden');
+            });
         });
     </script>
 </head>
-<body class="bg-gray-100 font-sans antialiased">
+<body class="p-4 md:p-8 flex flex-col items-center">
 
-    <!-- Modal de Confirmación (Limpiar TODO) -->
-    <div id="confirmModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-        <div class="bg-white rounded-lg shadow-lg p-6 max-w-sm mx-auto">
-            <h3 class="text-lg font-medium text-gray-900">Confirmar Limpieza Total</h3>
-            <p class="text-sm text-gray-500 mt-2">¿Estás seguro de que deseas eliminar TODOS los leads? Esta acción no se puede deshacer.</p>
-            <div class="mt-4 flex justify-end space-x-2">
-                <button id="cancelLimpiarBtn" type="button" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancelar</button>
-                <button id="confirmLimpiarBtn" type="button" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">Eliminar Todo</button>
-            </div>
+    <!-- Header & Loader -->
+    <header class="w-full max-w-7xl mb-8 flex justify-between items-center glass-panel rounded-2xl p-6">
+        <div>
+            <h1 class="text-3xl font-bold tracking-tight">Convertido de WhatsApp a Lead</h1>
+            <p class="text-white/60 text-sm mt-1">Departamento Comercial</p>
         </div>
-    </div>
-    
-    <!-- *** NUEVO *** Modal de Confirmación (Eliminar UNO) -->
-    <div id="confirmDeleteOneModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-        <div class="bg-white rounded-lg shadow-lg p-6 max-w-sm mx-auto">
-            <h3 class="text-lg font-medium text-gray-900">Confirmar Eliminación</h3>
-            <p class="text-sm text-gray-500 mt-2">¿Estás seguro de que deseas eliminar a <strong id="deleteLeadName" class="text-gray-900">este lead</strong>?</p>
-            <div class="mt-4 flex justify-end space-x-2">
-                <button id="cancelDeleteOneBtn" type="button" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancelar</button>
-                <button id="confirmDeleteOneBtn" type="button" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">Eliminar</button>
-            </div>
+        <div id="loader" class="hidden">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
         </div>
-    </div>
-    
-    <!-- Modal de Vista Previa de Excel -->
-    <div id="excelPreviewModal" class="hidden fixed inset-0 z-40 flex items-center justify-center bg-black bg-opacity-60 p-4">
-        <div class="bg-white rounded-lg shadow-2xl p-6 max-w-6xl w-full mx-auto flex flex-col" style="max-height: 90vh;">
-            <h3 class="text-xl font-medium text-gray-900 mb-4">Vista Previa de Carga de Excel</h3>
-            <p class="text-sm text-gray-600 mb-4">Corrige los datos detectados por la IA antes de guardarlos. Los cambios se guardan al salir del campo.</p>
-            
-            <div id="excelPreviewTableContainer" class="overflow-auto flex-grow mb-4 border rounded-lg">
-                <p class="text-center text-gray-500 p-8">Generando vista previa...</p>
-            </div>
-            
-            <div class="mt-4 flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2">
-                <button id="cancelExcelCargaBtn" type="button" class="px-5 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancelar</button>
-                <button id="confirmExcelCargaBtn" type="button" class="px-5 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Confirmar y Guardar Leads</button>
-            </div>
-        </div>
+    </header>
+
+    <!-- Caja de Mensajes Flotante -->
+    <div id="messageBox" class="hidden fixed top-24 right-8 max-w-sm z-50 shadow-2xl backdrop-blur-md">
+        <span id="messageText" class="font-medium"></span>
+        <button onclick="window.hideMessage()" class="ml-4 text-white/70 hover:text-white">&times;</button>
     </div>
 
-
-    <!-- Contenido Principal -->
-    <div class="container mx-auto p-4 md:p-8 max-w-7xl">
+    <main class="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        <header class="mb-6 flex justify-between items-center">
-            <h1 class="text-3xl font-bold text-gray-800">Procesador de Leads</h1>
-            <div id="loader" class="hidden">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-            </div>
-        </header>
-
-        <div id="messageBox" class="hidden border px-4 py-3 rounded-lg relative mb-4" role="alert">
-            <strong class="font-bold">Aviso: </strong>
-            <span id="messageText" class="block sm:inline"></span>
-            <span id="closeMessageBtn" class="absolute top-0 bottom-0 right-0 px-4 py-3 cursor-pointer">
-                <svg class="fill-current h-6 w-6" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><title>Cerrar</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
-            </span>
-        </div>
-
-        <!-- Panel de Entrada -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-            <div class="bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-xl font-semibold text-gray-700 mb-4">Opción 1: Pegar (Texto o Imagen)</h2>
-                <textarea id="mensajeInput"
-                    class="w-full h-32 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Pega aquí el mensaje de texto O una captura de pantalla (imagen)..."></textarea>
-                <button id="procesarBtn"
-                    class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow transition duration-300 ease-in-out">
-                    Procesar Texto
+        <!-- Columna Izquierda: Input -->
+        <section class="lg:col-span-5 flex flex-col gap-6">
+            <!-- Panel de Texto -->
+            <div class="glass-panel rounded-3xl p-6 relative overflow-hidden group">
+                <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-400 to-purple-400"></div>
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                    Ingreso Inteligente
+                </h2>
+                <textarea id="mensajeInput" 
+                    class="glass-input w-full h-40 p-4 rounded-xl text-sm resize-none mb-4" 
+                    placeholder="Pega un chat, un email o haz CTRL+V con una captura de pantalla (imagen). La IA lo procesará..."></textarea>
+                <button id="procesarBtn" class="glass-button w-full py-3 rounded-xl font-semibold text-white bg-blue-500/20 hover:bg-blue-500/40 border-blue-400/30">
+                    ✨ Procesar con IA
                 </button>
             </div>
+
+            <!-- Panel de Archivos -->
+            <div class="glass-panel rounded-3xl p-6">
+                <h2 class="text-lg font-semibold mb-4">Carga Masiva</h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <button onclick="document.getElementById('excelInput').click()" class="glass-button py-8 rounded-2xl flex flex-col items-center justify-center gap-2 hover:bg-emerald-500/20">
+                        <svg class="w-8 h-8 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        <span class="text-sm font-medium">Excel</span>
+                    </button>
+                    <button onclick="document.getElementById('imagenInput').click()" class="glass-button py-8 rounded-2xl flex flex-col items-center justify-center gap-2 hover:bg-indigo-500/20">
+                        <svg class="w-8 h-8 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                        <span class="text-sm font-medium">Imagen</span>
+                    </button>
+                </div>
+                <!-- Inputs ocultos -->
+                <input type="file" id="excelInput" class="hidden" accept=".xlsx">
+                <input type="file" id="imagenInput" class="hidden" accept="image/*">
+            </div>
             
-            <div class="bg-white p-6 rounded-lg shadow-md flex flex-col justify-between">
-                <div>
-                    <h2 class="text-xl font-semibold text-gray-700 mb-4">Opción 2: Cargar archivos</h2>
-                    <input type="file" id="excelInput" class="hidden" accept=".xlsx, .xls">
-                    <input type="file" id="imagenInput" class="hidden" accept="image/*">
-                    
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <button id="procesarExcelBtn"
-                            class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-6 rounded-lg shadow transition duration-300 ease-in-out">
-                            Cargar Excel
-                        </button>
-                        <button id="procesarImagenBtn"
-                            class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg shadow transition duration-300 ease-in-out">
-                            Cargar Imagen
-                        </button>
-                    </div>
+             <!-- Acciones -->
+             <div class="grid grid-cols-2 gap-4">
+                <button id="descargarBtn" disabled class="glass-button py-3 rounded-xl font-medium text-white/80 hover:text-white bg-white/5">
+                    ⬇ Descargar
+                </button>
+                <button id="limpiarBtn" disabled class="glass-button py-3 rounded-xl font-medium text-red-300 hover:text-red-100 bg-red-500/10 hover:bg-red-500/30">
+                    🗑 Limpiar
+                </button>
+            </div>
+        </section>
+
+        <!-- Columna Derecha: Tabla -->
+        <section class="lg:col-span-7">
+            <div class="glass-panel rounded-3xl overflow-hidden h-full flex flex-col min-h-[600px]">
+                <div class="p-6 border-b border-white/10 flex justify-between items-center">
+                    <h2 class="text-xl font-bold">Base de Datos</h2>
+                    <span class="text-xs px-2 py-1 rounded bg-white/10 text-white/60">Live Sync</span>
                 </div>
-                
-                <hr class="my-6">
-                
-                <div>
-                    <h2 class="text-xl font-semibold text-gray-700 mb-4">Acciones de Datos</h2>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <button id="descargarBtn"
-                            class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow transition duration-300 ease-in-out disabled:opacity-50" disabled>
-                            Descargar Excel
-                        </button>
-                        <button id="limpiarBtn"
-                            class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg shadow transition duration-300 ease-in-out disabled:opacity-50" disabled>
-                            Limpiar Datos
-                        </button>
-                    </div>
+                <div class="overflow-auto flex-grow">
+                    <table class="w-full text-left">
+                        <thead class="glass-table-header uppercase text-xs font-bold tracking-wider sticky top-0 backdrop-blur-md">
+                            <tr>
+                                <th class="p-4">ID</th>
+                                <th class="p-4">Nombre</th>
+                                <th class="p-4">Email</th>
+                                <th class="p-4">Teléfono</th>
+                                <th class="p-4">Tecnicatura</th>
+                                <th class="p-4">Estado</th>
+                                <th class="p-4">Vendedor</th>
+                                <th class="p-4">Creación</th>
+                                <th class="p-4">Observaciones</th>
+                                <th class="p-4 text-center">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leadsTableBody" class="divide-y divide-white/5 text-sm">
+                            <!-- Filas inyectadas por JS -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
-        </div>
+        </section>
+    </main>
 
-        <!-- Tabla de Leads -->
-        <div class="bg-white rounded-lg shadow-md overflow-hidden">
-            <h2 class="text-xl font-semibold text-gray-700 p-6">Historial de Leads</h2>
-            <div class="overflow-x-auto">
-                <table class="w-full min-w-max text-left text-sm text-gray-500">
-                    <thead class="text-xs text-gray-700 uppercase bg-gray-50">
-                        <tr>
-                            <script>
-                                const headers = [
-                                    'ID', 'Nombre', 'Email', 'Teléfono', 'Tecnicatura', 'Estado',
-                                    'Vendedor', 'Creación', 'Contacto', 'Obs.', 'Acciones'
-                                ];
-                                headers.forEach(h => document.write(`<th scope="col" class="p-3">${h}</th>`));
-                            </script>
-                        </tr>
-                    </thead>
-                    <tbody id="leadsTableBody">
-                        <tr>
-                            <td colspan="11" class="text-center text-gray-500 p-4">Cargando datos...</td>
-                        </tr>
-                    </tbody>
-                </table>
+    <!-- Modal Confirm Delete (Glass) -->
+    <div id="confirmDeleteOneModal" class="hidden fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/40">
+        <div class="glass-panel p-8 rounded-3xl max-w-sm w-full mx-4 transform transition-all scale-100">
+            <h3 class="text-xl font-bold mb-2">¿Eliminar Lead?</h3>
+            <p class="text-white/70 text-sm mb-6">Vas a eliminar a <strong id="deleteLeadName" class="text-white"></strong>. Esta acción no se deshace.</p>
+            <div class="flex justify-end gap-3">
+                <button class="close-modal glass-button px-4 py-2 rounded-lg text-sm">Cancelar</button>
+                <button id="confirmDeleteOneBtn" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg shadow-red-500/30 transition text-sm font-medium">Eliminar</button>
             </div>
         </div>
+    </div>
 
+    <!-- Modal Confirm Limpiar (Glass) -->
+    <div id="confirmModal" class="hidden fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/40">
+        <div class="glass-panel p-8 rounded-3xl max-w-sm w-full mx-4">
+            <h3 class="text-xl font-bold mb-2 text-red-300">⚠️ Zona de Peligro</h3>
+            <p class="text-white/70 text-sm mb-6">Estás a punto de borrar <strong>TODA</strong> la base de datos.</p>
+            <div class="flex justify-end gap-3">
+                <button class="close-modal glass-button px-4 py-2 rounded-lg text-sm">Cancelar</button>
+                <button onclick="window.confirmLimpiarDatos()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg shadow-lg shadow-red-600/30 transition text-sm font-medium">Borrar Todo</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Excel Preview (Glass) -->
+    <div id="excelPreviewModal" class="hidden fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/60 p-4">
+        <div class="glass-panel p-6 rounded-3xl w-full max-w-4xl max-h-[80vh] flex flex-col">
+            <h3 class="text-xl font-bold mb-4">Vista Previa Excel</h3>
+            <div id="excelPreviewTableContainer" class="overflow-auto flex-grow mb-4 border border-white/10 rounded-xl"></div>
+            <div class="flex justify-end gap-3 pt-4 border-t border-white/10">
+                <button class="close-modal glass-button px-6 py-2 rounded-xl">Cancelar</button>
+                <button id="confirmExcelCargaBtn" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-xl shadow-lg shadow-blue-500/30">Guardar Leads</button>
+            </div>
+        </div>
     </div>
 
 </body>
