@@ -336,13 +336,41 @@
             return await makeGeminiApiCall(apiUrl, payload);
         }
 
+        // *** FUNCIÓN DE CONEXIÓN CORREGIDA PARA MOSTRAR ERRORES REALES ***
         async function makeGeminiApiCall(apiUrl, payload) {
-            const response = await fetch(apiUrl, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
-            });
-            if (!response.ok) throw new Error(response.statusText);
-            const result = await response.json();
-            return JSON.parse(result.candidates[0].content.parts[0].text);
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    let errorMsg = `Error ${response.status}`;
+                    try {
+                        const errorData = await response.json();
+                        if (errorData.error && errorData.error.message) {
+                            errorMsg = `API Error: ${errorData.error.message}`;
+                        } else {
+                            errorMsg = `API Error: ${response.statusText}`;
+                        }
+                    } catch (e) {
+                        errorMsg = `API Error: ${response.statusText || await response.text()}`;
+                    }
+                    throw new Error(errorMsg);
+                }
+                
+                const result = await response.json();
+                
+                if (!result.candidates || !result.candidates.length) {
+                    throw new Error("La IA no devolvió resultados. (Posible bloqueo de seguridad)");
+                }
+
+                return JSON.parse(result.candidates[0].content.parts[0].text);
+            } catch (error) {
+                console.error("Fallo detallado de IA:", error);
+                throw error; 
+            }
         }
 
         // --- Table Render ---
@@ -495,10 +523,21 @@
                 window.showLoader(false);
             };
 
+            // *** EXPORTACIÓN DE EXCEL ACTUALIZADA (Todas las columnas) ***
             document.getElementById('descargarBtn').onclick = () => {
-                 const ws = window.XLSX.utils.json_to_sheet(currentLeads.map(l => ({
-                     Nombre: l.nombreCompleto, Email: l.email, Obs: l.observaciones
-                 })));
+                 const dataForExcel = currentLeads.map(l => ({
+                     'ID': l.id,
+                     'Nombre Completo': l.nombreCompleto,
+                     'Email': l.email,
+                     'Teléfono': l.telefono,
+                     'Tecnicatura': tecnicaturaNameMap[l.tecnicaturaId] || l.tecnicaturaId || '',
+                     'Estado': l.estado,
+                     'Vendedor Asignado': l.vendedorAsignado || '',
+                     'Fecha de Creación': l.fechaCreacion,
+                     'Último Contacto': l.ultimoContacto || '',
+                     'Observaciones': l.observaciones
+                 }));
+                 const ws = window.XLSX.utils.json_to_sheet(dataForExcel);
                  const wb = window.XLSX.utils.book_new();
                  window.XLSX.utils.book_append_sheet(wb, ws, "Leads");
                  window.XLSX.writeFile(wb, "leads_glass.xlsx");
