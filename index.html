@@ -530,7 +530,7 @@
                      'Nombre Completo': l.nombreCompleto,
                      'Email': l.email,
                      'Teléfono': l.telefono,
-                     'Tecnicatura': tecnicaturaNameMap[l.tecnicaturaId] || l.tecnicaturaId || '',
+                     'Tecnicatura': l.tecnicaturaId || '',
                      'Estado': l.estado,
                      'Vendedor Asignado': l.vendedorAsignado || '',
                      'Fecha de Creación': l.fechaCreacion,
@@ -540,7 +540,7 @@
                  const ws = window.XLSX.utils.json_to_sheet(dataForExcel);
                  const wb = window.XLSX.utils.book_new();
                  window.XLSX.utils.book_append_sheet(wb, ws, "Leads");
-                 window.XLSX.writeFile(wb, "leads_glass.xlsx");
+                 window.XLSX.writeFile(wb, "Lead a exportar.xlsx");
             };
 
             // Files & Paste
