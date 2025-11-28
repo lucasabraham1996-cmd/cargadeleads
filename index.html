@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Procesador de Leads v6.3 - Conexión Estable</title>
+    <title>Procesador de Leads v6.4 - Conexión Garantizada</title>
     <!-- Carga de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -191,14 +191,23 @@
         let leadIdToEdit = null;
         let leadIdToDelete = null;
 
-        // --- Firebase Init (CORREGIDO) ---
+        // --- Firebase Init (CORREGIDO + FALLBACK MANUAL) ---
         async function setupFirebase() {
             try {
-                // Usar configuración inyectada por el entorno si existe, sino un fallback (para pruebas locales)
-                const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+                // 1. Intentar obtener configuración del entorno
+                let firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
                 
+                // 2. Si no existe, usar FALLBACK HARDCODEADO (Para que funcione siempre)
                 if (!firebaseConfig) {
-                    throw new Error("Configuración de Firebase no encontrada. El entorno no proveyó las credenciales.");
+                    console.warn("Usando configuración de respaldo (Fallback Mode)");
+                    firebaseConfig = {
+                        apiKey: "AIzaSyClcQiTJj91vzb0P5737owh4tUyJPLWgEA",
+                        authDomain: "cargadeleads.firebaseapp.com",
+                        projectId: "cargadeleads",
+                        storageBucket: "cargadeleads.firebasestorage.app",
+                        messagingSenderId: "744616190679",
+                        appId: "1:744616190679:web:af63cbf7b42ee455a30692"
+                    };
                 }
 
                 const app = initializeApp(firebaseConfig);
@@ -220,8 +229,7 @@
                 // Listener de Estado de Autenticación
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
-                        // Conexión exitosa, establecer referencia a la colección
-                        // IMPORTANTE: Ruta estricta para permisos
+                        // Conexión exitosa
                         leadsCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'leads');
                         console.log("Autenticado como:", user.uid);
                         listenToAllLeads();
@@ -694,7 +702,7 @@
                 <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-sky-400 to-teal-400">
                     Convertidor de WhatsApp a Leads
                 </h1>
-                <p class="text-sm text-slate-400 mt-1">Dpto. Comercial • v6.3 Fix Conexión</p>
+                <p class="text-sm text-slate-400 mt-1">Dpto. Comercial • v6.4 Fix Final</p>
             </div>
             <!-- Indicador de Sincronización -->
             <div class="flex items-center gap-2 bg-slate-900/50 px-4 py-2 rounded-full border border-slate-700/50">
