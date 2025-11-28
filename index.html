@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Procesador de Leads v6.6 - Dashboard Restaurado</title>
+    <title>Procesador de Leads v6.7 - Final Release</title>
     <!-- Carga de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -161,14 +161,16 @@
             'Estado', 'Vendedor Asignado', 'Fecha de Creación', 'Último Contacto', 'Observaciones'
         ];
         
+        // Prompt mejorado para Emails
         const systemPromptForGemini = `
             Eres un asistente experto en data entry. Analiza el texto o imagen provista y extrae un objeto JSON con:
             { "nombre": string, "email": string, "telefono": string, "tecnicatura": string, "preferencia_contacto": "whatsapp" | "telefono" | null }
             
             Reglas:
             1. Nombre + Apellido -> campo 'nombre'.
-            2. Tecnicatura EXACTA: 'Desarrollo web', 'Administración de empresas', 'Marketing', 'Higiene y seguridad', 'Gestión inmobiliaria', 'Analista de sistemas', 'Ciencia de datos e IA', 'Recursos humanos'.
-            3. Contacto: 'wpp'/'mensaje'/'escribir' -> 'whatsapp'; 'llamar'/'voz'/'telefono' -> 'telefono'. Si no hay indicio claro, null.
+            2. Email: Busca patrones de correo (ej: usuario@dominio.com) en todo el texto. Si encuentras uno, úsalo.
+            3. Tecnicatura EXACTA: 'Desarrollo web', 'Administración de empresas', 'Marketing', 'Higiene y seguridad', 'Gestión inmobiliaria', 'Analista de sistemas', 'Ciencia de datos e IA', 'Recursos humanos'.
+            4. Contacto: 'wpp'/'mensaje'/'escribir' -> 'whatsapp'; 'llamar'/'voz'/'telefono' -> 'telefono'. Si no hay indicio claro, null.
         `;
 
         const jsonSchemaForGemini = {
@@ -190,10 +192,9 @@
         let leadIdToEdit = null;
         let leadIdToDelete = null;
 
-        // --- Firebase Init (RESTAURADO CON RUTA ORIGINAL) ---
+        // --- Firebase Init ---
         async function setupFirebase() {
             try {
-                // Configuración manual exacta del código original que funcionaba
                 const firebaseConfig = {
                     apiKey: ORIGINAL_API_KEY,
                     authDomain: "cargadeleads.firebaseapp.com",
@@ -210,13 +211,8 @@
                 await signInAnonymously(auth);
                 console.log("Conectado como Anónimo");
 
-                // *** CORRECCIÓN CRÍTICA ***
-                // En v5.8 usabas 'leads' (ruta simple). En v6.5 cambié a 'artifacts/...'.
-                // Tu base de datos probablemente solo tiene permisos para 'leads'.
-                // REVERTIMOS A LA RUTA ORIGINAL PARA QUE FUNCIONE:
                 leadsCollectionRef = collection(db, 'leads'); 
                 
-                // Iniciar escucha
                 listenToAllLeads();
 
             } catch (err) {
@@ -238,14 +234,12 @@
                     allLeads.push({ id: doc.id, ...doc.data() });
                 });
                 
-                // Ordenar: Más recientes primero
                 allLeads.sort((a, b) => (b.fechaCreacionTimestamp || 0) - (a.fechaCreacionTimestamp || 0));
                 
-                updateSyncStatus(true); // ¡Conexión exitosa!
+                updateSyncStatus(true);
                 filterAndRender();
             }, (error) => {
                 console.error("Snapshot error:", error);
-                // Si el error es de permisos, es muy probable que sea por la ruta.
                 if (error.code === 'permission-denied') {
                     showMessage("Error de Permisos: Verifica las reglas de Firestore.", true);
                 } else {
@@ -312,7 +306,6 @@
         async function processAndSaveLead(parsedData, showDuplicateMessage = false) {
             if (!parsedData) return false;
             
-            // Verificación de duplicados en leads activos
             const duplicate = checkIfLeadExists(parsedData.email, parsedData.telefono);
             if (duplicate) {
                 if (showDuplicateMessage) showMessage(duplicate, true);
@@ -327,6 +320,7 @@
                     day: '2-digit', month: '2-digit', year: 'numeric'
                 });
 
+                // Construcción de observaciones mejorada
                 const observacionesAuto = buildObservaciones(parsedData);
 
                 const newLead = {
@@ -358,8 +352,13 @@
         function buildObservaciones(parsedData) {
             const prefix = "Ingresa por WhatsApp Comercial: ";
             let content = "Consulta general.";
-            if (parsedData.preferencia_contacto === 'whatsapp') content = "Manifiesta que la contacten por WhatsApp.";
-            if (parsedData.preferencia_contacto === 'telefono') content = "Manifiesta que prefiere por esa vía.";
+            
+            if (parsedData.preferencia_contacto === 'whatsapp') {
+                content = "Manifiesta que la contacten por WhatsApp.";
+            } else if (parsedData.preferencia_contacto === 'telefono') {
+                content = "Manifiesta que prefiere por esa vía.";
+            }
+            
             return `${prefix}${content}`;
         }
 
@@ -376,13 +375,11 @@
 
         // --- Manejadores de Interfaz ---
 
-        // Procesar Texto
         window.handleProcesarClick = async () => {
             const input = document.getElementById('mensajeInput');
             const txt = input.value;
             if (!txt.trim()) return showMessage("Por favor, ingresa un texto.", true);
             
-            // Verificación simple de conexión
             if(!leadsCollectionRef) {
                 return showMessage("Esperando conexión a base de datos...", true);
             }
@@ -402,21 +399,24 @@
             }
         };
 
-        // Descargar
+        // Descargar Excel (CORREGIDO: IDs en Tecnicatura)
         window.handleDescargar = () => {
             if (displayLeads.length === 0) return;
+            
             const data = displayLeads.map(l => ({
                 'ID': l.id.substring(0,5).toUpperCase(),
                 'Nombre Completo': l.nombreCompleto,
                 'Email': l.email,
                 'Teléfono': l.telefono,
-                'Tecnicatura': tecnicaturaNameMap[l.tecnicaturaId] || l.tecnicaturaId || '',
+                // AQUÍ EL CAMBIO: Exportamos l.tecnicaturaId directamente (el ID numérico)
+                'Tecnicatura': l.tecnicaturaId || '',
                 'Estado': l.estado,
                 'Vendedor Asignado': l.vendedorAsignado,
                 'Fecha de Creación': l.fechaCreacion,
                 'Último Contacto': l.ultimoContacto,
                 'Observaciones': l.observaciones
             }));
+            
             const ws = XLSX.utils.json_to_sheet(data, { header: excelHeaders });
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Leads");
@@ -438,7 +438,6 @@
                 const tr = document.createElement('tr');
                 tr.className = "table-row group";
                 
-                // Botones según vista
                 let btns = '';
                 if (showArchived) {
                     btns = `
@@ -458,7 +457,6 @@
                         </button>`;
                 }
 
-                // Estado con color
                 let statusColor = 'bg-gray-700 text-gray-300';
                 if (lead.estado === 'contactado') statusColor = 'bg-blue-900 text-blue-200';
                 if (lead.estado === 'matriculado') statusColor = 'bg-green-900 text-green-200';
@@ -687,7 +685,7 @@
                 <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-sky-400 to-teal-400">
                     Convertidor de WhatsApp a Leads
                 </h1>
-                <p class="text-sm text-slate-400 mt-1">Dpto. Comercial • v6.6 Fix Ruta</p>
+                <p class="text-sm text-slate-400 mt-1">Dpto. Comercial • v6.7 Final Release</p>
             </div>
             <!-- Indicador de Sincronización -->
             <div class="flex items-center gap-2 bg-slate-900/50 px-4 py-2 rounded-full border border-slate-700/50">
