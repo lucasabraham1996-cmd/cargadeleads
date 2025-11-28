@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Convertidor de WhatsApp a Leads v6.3</title>
+    <title>Convertidor de WhatsApp a Leads v6.4 (Cloud Sync)</title>
     <!-- Carga de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -156,7 +156,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, query, onSnapshot, setLogLevel, getDocs, deleteDoc, updateDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, query, onSnapshot, setLogLevel, getDocs, deleteDoc, updateDoc, doc, setDoc, increment, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Configuración ---
         const GEMINI_API_KEY = "AIzaSyClcQiTJj91vzb0P5737owh4tUyJPLWgEA"; 
@@ -204,6 +204,7 @@
         let excelPreviewData = [];
         let leadIdToDelete = null; 
         let leadIdToEdit = null;
+        let statsDocRef = null; // Referencia al documento de estadísticas
         
         // --- Firebase Init ---
         async function setupFirebase() {
@@ -227,7 +228,13 @@
                 await signInAnonymously(auth);
                 const collectionPath = `leads`; 
                 leadsCollectionRef = collection(db, collectionPath);
+                
+                // Configurar referencia de estadísticas (Global para todos los usuarios)
+                statsDocRef = doc(db, 'statistics', 'global_counters');
+                
                 listenToAllLeads();
+                listenToStats();
+                
             } catch (err) {
                 console.error("Firebase Error:", err);
                 window.showMessage(`Error conectando base de datos: ${err.message}`, true);
@@ -262,6 +269,65 @@
                 }
             });
         }
+
+        // --- Stats Logic (Cloud Sync) ---
+        function listenToStats() {
+            if(!statsDocRef) return;
+            
+            onSnapshot(statsDocRef, (docSnapshot) => {
+                if (docSnapshot.exists()) {
+                    const stats = docSnapshot.data();
+                    updateStatsUI(stats);
+                } else {
+                    // Si no existe, inicializarlo
+                    setDoc(statsDocRef, { total: 0, wpp: 0, call: 0 });
+                    updateStatsUI({ total: 0, wpp: 0, call: 0 });
+                }
+            });
+        }
+
+        function updateStatsUI(stats) {
+            const total = stats.total || 0;
+            const wpp = stats.wpp || 0;
+            const call = stats.call || 0;
+            
+            const wppPercent = total > 0 ? Math.round((wpp / total) * 100) : 0;
+            const callPercent = total > 0 ? Math.round((call / total) * 100) : 0;
+            
+            document.getElementById('statTotal').textContent = total;
+            document.getElementById('statWpp').textContent = `${wpp} (${wppPercent}%)`;
+            document.getElementById('statCall').textContent = `${call} (${callPercent}%)`;
+        }
+
+        // Función para incrementar estadísticas en la Nube
+        async function incrementCloudStats(preference) {
+            if (!statsDocRef) return;
+            
+            // Usamos increment para operaciones atómicas seguras
+            const updates = {
+                total: increment(1)
+            };
+            
+            if (preference === 'WhatsApp') updates.wpp = increment(1);
+            if (preference === 'Llamada') updates.call = increment(1);
+            
+            try {
+                // updateDoc fallará si el documento no existe, setDoc con merge es más seguro aquí
+                await setDoc(statsDocRef, updates, { merge: true });
+            } catch (e) {
+                console.error("Error updating stats:", e);
+            }
+        }
+
+        window.resetCloudStats = async () => {
+            if(confirm("¿Estás seguro de que quieres reiniciar TODOS los contadores históricos a cero? Esto afectará a todos los usuarios.")) {
+                if(statsDocRef) {
+                    await setDoc(statsDocRef, { total: 0, wpp: 0, call: 0 });
+                    window.showMessage("Contadores históricos reiniciados.", false);
+                }
+            }
+        };
+
 
         function checkIfLeadExists(email, phone) {
             const newEmail = email ? email.trim() : '';
@@ -311,8 +377,8 @@
                 const { id, ...dataToSave } = newLead;
                 await addDoc(leadsCollectionRef, dataToSave);
                 
-                // Actualizar estadísticas históricas (Local Storage)
-                window.updateLocalStats(parsedData.preferencia_contacto);
+                // Actualizar estadísticas EN LA NUBE
+                await incrementCloudStats(parsedData.preferencia_contacto);
                 
                 return true;
             } catch (err) {
@@ -331,13 +397,9 @@
             document.getElementById('editEmail').value = lead.email;
             document.getElementById('editTelefono').value = lead.telefono;
             
-            // Set Tecnicatura Select
-            // Necesitamos encontrar la llave del mapa basada en el ID, o poner el ID directamente si el select usa IDs.
-            // El mapa es Nombre -> ID. El Select debe usar ID como value.
             const tecSelect = document.getElementById('editTecnicatura');
             tecSelect.value = lead.tecnicaturaId || "";
 
-            // Set Preferencia Select basada en observaciones
             const prefSelect = document.getElementById('editPreferencia');
             if (lead.observaciones && lead.observaciones.includes('WhatsApp')) {
                 prefSelect.value = 'WhatsApp';
@@ -372,7 +434,7 @@
                     email: email,
                     telefono: telefono,
                     tecnicaturaId: parseInt(tecnicaturaId) || '',
-                    observaciones: observacionesFinal // Actualizamos la observación basada en la nueva preferencia
+                    observaciones: observacionesFinal 
                 });
 
                 window.showMessage("Lead actualizado correctamente.", false);
@@ -384,38 +446,6 @@
                 window.showMessage(`Error al actualizar: ${err.message}`, true);
             } finally {
                 window.showLoader(false);
-            }
-        };
-
-        // --- Stats Logic (Local Storage) ---
-        window.updateLocalStats = (preference) => {
-            let stats = JSON.parse(localStorage.getItem('leadStats')) || { total: 0, wpp: 0, call: 0 };
-            
-            stats.total++;
-            if(preference === 'WhatsApp') stats.wpp++;
-            if(preference === 'Llamada') stats.call++;
-            
-            localStorage.setItem('leadStats', JSON.stringify(stats));
-            window.renderStatsUI();
-        };
-
-        window.renderStatsUI = () => {
-            let stats = JSON.parse(localStorage.getItem('leadStats')) || { total: 0, wpp: 0, call: 0 };
-            
-            // Cálculos de porcentaje
-            const wppPercent = stats.total > 0 ? Math.round((stats.wpp / stats.total) * 100) : 0;
-            const callPercent = stats.total > 0 ? Math.round((stats.call / stats.total) * 100) : 0;
-            
-            // Actualizar DOM
-            document.getElementById('statTotal').textContent = stats.total;
-            document.getElementById('statWpp').textContent = `${stats.wpp} (${wppPercent}%)`;
-            document.getElementById('statCall').textContent = `${stats.call} (${callPercent}%)`;
-        };
-
-        window.resetStats = () => {
-            if(confirm("¿Reiniciar el historial de estadísticas a cero? Esto no borra los leads de la tabla, solo los contadores.")) {
-                localStorage.setItem('leadStats', JSON.stringify({ total: 0, wpp: 0, call: 0 }));
-                window.renderStatsUI();
             }
         };
 
@@ -444,7 +474,7 @@
                 const snapshot = await getDocs(leadsCollectionRef);
                 const deletePromises = snapshot.docs.map(d => deleteDoc(doc(leadsCollectionRef, d.id)));
                 await Promise.all(deletePromises);
-                window.showMessage("Base de datos de leads limpiada (Historial conservado).", false);
+                window.showMessage("Base de datos de leads limpiada (Historial conservado en nube).", false);
             } catch (e) {
                 window.showMessage("Error al limpiar: " + e.message, true);
             } finally {
@@ -652,7 +682,6 @@
         // DOM Loaded
         document.addEventListener('DOMContentLoaded', () => {
             setupFirebase();
-            window.renderStatsUI(); 
             
             // Buttons
             document.getElementById('procesarBtn').addEventListener('click', async () => {
@@ -758,7 +787,7 @@
     <header class="w-full max-w-7xl mb-8 flex justify-between items-center glass-panel rounded-2xl p-6">
         <div>
             <h1 class="text-3xl font-bold tracking-tight">Convertidor de WhatsApp a Leads</h1>
-            <p class="text-white/60 text-sm mt-1">Dpto. Comercial (versión 6.3)</p>
+            <p class="text-white/60 text-sm mt-1">Dpto. Comercial (versión 6.4)</p>
         </div>
         <div id="loader" class="hidden">
             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
@@ -841,7 +870,7 @@
                 <div class="p-6 border-b border-white/10 flex justify-between items-center">
                     <div>
                         <h2 class="text-xl font-bold">Base de Datos</h2>
-                        <span class="text-xs text-white/50">Historial persistente: <span onclick="window.resetStats()" class="cursor-pointer hover:text-red-300 underline" title="Clic para reiniciar contadores">Resetear contadores</span></span>
+                        <span class="text-xs text-white/50">Historial Cloud: <span onclick="window.resetCloudStats()" class="cursor-pointer hover:text-red-300 underline" title="Clic para reiniciar contadores en la NUBE">Resetear contadores</span></span>
                     </div>
                     <span class="text-xs px-2 py-1 rounded bg-white/10 text-white/60">Live Sync</span>
                 </div>
@@ -934,7 +963,7 @@
     <div id="confirmModal" class="hidden fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/40">
         <div class="glass-panel p-8 rounded-3xl max-w-sm w-full mx-4">
             <h3 class="text-xl font-bold mb-2 text-red-300">⚠️ Zona de Peligro</h3>
-            <p class="text-white/70 text-sm mb-6">Estás a punto de borrar <strong>TODA</strong> la tabla de leads para empezar a cargar de nuevo.<br><br><span class="text-green-300 text-xs font-bold">NOTA: Tu historial de estadísticas NO se borrará.</span></p>
+            <p class="text-white/70 text-sm mb-6">Estás a punto de borrar <strong>TODA</strong> la tabla de leads para empezar a cargar de nuevo.<br><br><span class="text-green-300 text-xs font-bold">NOTA: Tu historial de estadísticas NO se borrará (está en la nube).</span></p>
             <div class="flex justify-end gap-3">
                 <button class="close-modal glass-button px-4 py-2 rounded-lg text-sm">Cancelar</button>
                 <button onclick="window.confirmLimpiarDatos()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg shadow-lg shadow-red-600/30 transition text-sm font-medium">Borrar Tabla</button>
