@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Convertidor de WhatsApp a Leads v6.6 (Auth Fix)</title>
+    <title>Convertidor de WhatsApp a Leads v6.7 (Auth Blindada)</title>
     <!-- Carga de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -155,7 +155,7 @@
     <!-- Carga de Firebase -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, onSnapshot, setLogLevel, getDocs, deleteDoc, updateDoc, doc, setDoc, increment, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Configuración ---
@@ -204,10 +204,10 @@
         let excelPreviewData = [];
         let leadIdToDelete = null; 
         let leadIdToEdit = null;
-        let statsDocRef = null; // Referencia al documento de estadísticas
+        let statsDocRef = null; 
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         
-        // --- Firebase Init ---
+        // --- Firebase Init (Blindado) ---
         async function setupFirebase() {
             try {
                 const firebaseConfig = {
@@ -224,23 +224,40 @@
                 db = getFirestore(app);
                 auth = getAuth(app);
 
-                // *** AUTH FIX: Usar token si existe, sino anónimo ***
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
+                // *** AUTH FIX MEJORADO: Fallback automático ***
+                try {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                        console.log("Autenticado con Token");
+                    } else {
+                        throw new Error("No token provided");
+                    }
+                } catch (e) {
+                    console.warn("Fallo auth por token, intentando Anónimo...", e);
                     await signInAnonymously(auth);
+                    console.log("Autenticado Anónimamente");
                 }
                 
-                // Usamos /artifacts/{appId}/public/data/... para garantizar permisos de escritura
+                // Configurar referencias (Solo una vez)
                 leadsCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'leads');
                 statsDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'statistics', 'global_counters');
                 
-                listenToAllLeads();
-                listenToStats();
+                // Escuchar cambios de autenticación ANTES de pedir datos
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        console.log("Usuario detectado:", user.uid);
+                        // Solo iniciamos listeners si tenemos usuario
+                        listenToAllLeads();
+                        listenToStats();
+                    } else {
+                        console.log("Usuario desconectado, reintentando login...");
+                        signInAnonymously(auth);
+                    }
+                });
                 
             } catch (err) {
-                console.error("Firebase Error:", err);
-                window.showMessage(`Error conectando base de datos: ${err.message}`, true);
+                console.error("Firebase Error Fatal:", err);
+                window.showMessage(`Error crítico de conexión: ${err.message}`, true);
                 document.getElementById('loader').classList.add('hidden');
             }
         }
@@ -248,14 +265,14 @@
         // --- Core Logic ---
 
         function listenToAllLeads() {
-            if (!leadsCollectionRef) return;
+            if (!leadsCollectionRef || !auth.currentUser) return; // Doble check
+            
             const q = query(leadsCollectionRef);
             onSnapshot(q, (snapshot) => {
                 currentLeads = [];
                 snapshot.forEach((doc) => {
                     currentLeads.push({ id: doc.id, ...doc.data() });
                 });
-                // Ordenar descendente por timestamp
                 currentLeads.sort((a, b) => (b.fechaCreacionTimestamp || 0) - (a.fechaCreacionTimestamp || 0));
                 renderTable();
                 
@@ -273,22 +290,28 @@
                 }
             }, (error) => {
                 console.error("Error listening to leads:", error);
-                window.showMessage("Error leyendo leads (Permisos): " + error.message, true);
+                // Si falla por permisos, intentamos reautenticar silenciosamente una vez
+                if (error.code === 'permission-denied') {
+                     window.showMessage("Reconectando base de datos...", false);
+                     signInAnonymously(auth);
+                } else {
+                     window.showMessage("Error leyendo leads: " + error.message, true);
+                }
             });
         }
 
         // --- Stats Logic (Cloud Sync) ---
         function listenToStats() {
-            if(!statsDocRef) return;
+            if(!statsDocRef || !auth.currentUser) return;
             
             onSnapshot(statsDocRef, (docSnapshot) => {
                 if (docSnapshot.exists()) {
                     const stats = docSnapshot.data();
                     updateStatsUI(stats);
                 } else {
-                    // Si no existe, inicializarlo (el primer usuario lo crea)
+                    // Intento seguro de crear stats si no existen
                     setDoc(statsDocRef, { total: 0, wpp: 0, call: 0 }, { merge: true })
-                        .catch(e => console.log("Init stats skipped or failed", e));
+                        .catch(e => console.log("Stats init harmless fail", e));
                     updateStatsUI({ total: 0, wpp: 0, call: 0 });
                 }
             }, (error) => {
@@ -313,7 +336,6 @@
         async function incrementCloudStats(preference) {
             if (!statsDocRef) return;
             
-            // Usamos increment para operaciones atómicas seguras
             const updates = {
                 total: increment(1)
             };
@@ -322,11 +344,9 @@
             if (preference === 'Llamada') updates.call = increment(1);
             
             try {
-                // setDoc con merge: true crea el documento si no existe o actualiza si existe
                 await setDoc(statsDocRef, updates, { merge: true });
             } catch (e) {
                 console.error("Error updating stats:", e);
-                // No mostrar error al usuario por stats, para no bloquear flujo principal
             }
         }
 
@@ -372,7 +392,7 @@
                 }
 
                 const newLead = {
-                    id: '', // Se genera auto por Firestore al usar addDoc, pero necesitamos estructura
+                    id: '', 
                     nombreCompleto: parsedData.nombre || '',
                     email: parsedData.email || '',
                     telefono: parsedData.telefono || '',
@@ -385,7 +405,6 @@
                     observaciones: observacionesFinal 
                 };
                 
-                // Quitamos ID vacío para guardar
                 const { id, ...dataToSave } = newLead;
                 await addDoc(leadsCollectionRef, dataToSave);
                 
@@ -487,7 +506,7 @@
             window.showLoader(true);
             try {
                 const snapshot = await getDocs(leadsCollectionRef);
-                const deletePromises = snapshot.docs.map(d => deleteDoc(doc(leadsCollectionRef, d.id))); // Usar ref correcta
+                const deletePromises = snapshot.docs.map(d => deleteDoc(doc(leadsCollectionRef, d.id))); 
                 await Promise.all(deletePromises);
                 window.showMessage("Base de datos de leads limpiada (Historial conservado en nube).", false);
             } catch (e) {
@@ -803,7 +822,7 @@
     <header class="w-full max-w-7xl mb-8 flex justify-between items-center glass-panel rounded-2xl p-6">
         <div>
             <h1 class="text-3xl font-bold tracking-tight">Convertidor de WhatsApp a Leads</h1>
-            <p class="text-white/60 text-sm mt-1">Dpto. Comercial (versión 6.6)</p>
+            <p class="text-white/60 text-sm mt-1">Dpto. Comercial (versión 6.7)</p>
         </div>
         <div id="loader" class="hidden">
             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
