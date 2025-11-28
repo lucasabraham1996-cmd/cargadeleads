@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Convertidor de WhatsApp a Leads v6.4 (Cloud Sync)</title>
+    <title>Convertidor de WhatsApp a Leads v6.5 (Stats Fix)</title>
     <!-- Carga de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -205,6 +205,7 @@
         let leadIdToDelete = null; 
         let leadIdToEdit = null;
         let statsDocRef = null; // Referencia al documento de estadísticas
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         
         // --- Firebase Init ---
         async function setupFirebase() {
@@ -219,18 +220,17 @@
                     measurementId: "G-Y40TM1HJ02"
                 };
                 
-                if (!firebaseConfig.apiKey) throw new Error("Sin API Key de Firebase");
-
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
 
+                // Esperar autenticación
                 await signInAnonymously(auth);
-                const collectionPath = `leads`; 
-                leadsCollectionRef = collection(db, collectionPath);
                 
-                // Configurar referencia de estadísticas (Global para todos los usuarios)
-                statsDocRef = doc(db, 'statistics', 'global_counters');
+                // *** CORRECCIÓN DE RUTAS ***
+                // Usamos /artifacts/{appId}/public/data/... para garantizar permisos de escritura
+                leadsCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'leads');
+                statsDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'statistics', 'global_counters');
                 
                 listenToAllLeads();
                 listenToStats();
@@ -252,7 +252,8 @@
                 snapshot.forEach((doc) => {
                     currentLeads.push({ id: doc.id, ...doc.data() });
                 });
-                currentLeads.sort((a, b) => b.fechaCreacionTimestamp - a.fechaCreacionTimestamp);
+                // Ordenar descendente por timestamp
+                currentLeads.sort((a, b) => (b.fechaCreacionTimestamp || 0) - (a.fechaCreacionTimestamp || 0));
                 renderTable();
                 
                 const hasLeads = currentLeads.length > 0;
@@ -267,6 +268,9 @@
                     limpiarBtn.disabled = !hasLeads;
                     limpiarBtn.classList.toggle('opacity-50', !hasLeads);
                 }
+            }, (error) => {
+                console.error("Error listening to leads:", error);
+                window.showMessage("Error leyendo leads: " + error.message, true);
             });
         }
 
@@ -279,10 +283,13 @@
                     const stats = docSnapshot.data();
                     updateStatsUI(stats);
                 } else {
-                    // Si no existe, inicializarlo
-                    setDoc(statsDocRef, { total: 0, wpp: 0, call: 0 });
+                    // Si no existe, inicializarlo (el primer usuario lo crea)
+                    setDoc(statsDocRef, { total: 0, wpp: 0, call: 0 })
+                        .catch(e => console.log("Init stats skipped or failed", e));
                     updateStatsUI({ total: 0, wpp: 0, call: 0 });
                 }
+            }, (error) => {
+                console.error("Error listening to stats:", error);
             });
         }
 
@@ -312,10 +319,11 @@
             if (preference === 'Llamada') updates.call = increment(1);
             
             try {
-                // updateDoc fallará si el documento no existe, setDoc con merge es más seguro aquí
+                // setDoc con merge: true crea el documento si no existe o actualiza si existe
                 await setDoc(statsDocRef, updates, { merge: true });
             } catch (e) {
                 console.error("Error updating stats:", e);
+                window.showMessage("No se pudo actualizar el contador: " + e.message, true);
             }
         }
 
@@ -361,7 +369,7 @@
                 }
 
                 const newLead = {
-                    id: '',
+                    id: '', // Se genera auto por Firestore al usar addDoc, pero necesitamos estructura
                     nombreCompleto: parsedData.nombre || '',
                     email: parsedData.email || '',
                     telefono: parsedData.telefono || '',
@@ -374,6 +382,7 @@
                     observaciones: observacionesFinal 
                 };
                 
+                // Quitamos ID vacío para guardar
                 const { id, ...dataToSave } = newLead;
                 await addDoc(leadsCollectionRef, dataToSave);
                 
@@ -383,6 +392,7 @@
                 return true;
             } catch (err) {
                 console.error("Save Error:", err);
+                window.showMessage("Error guardando lead: " + err.message, true);
                 return false;
             }
         }
@@ -428,7 +438,9 @@
                     observacionesFinal = `Prefiere: ${preferencia}`;
                 }
 
-                const leadRef = doc(db, 'leads', leadIdToEdit);
+                // Ruta correcta para actualizar
+                const leadRef = doc(db, 'artifacts', appId, 'public', 'data', 'leads', leadIdToEdit);
+                
                 await updateDoc(leadRef, {
                     nombreCompleto: nombre,
                     email: email,
@@ -472,7 +484,7 @@
             window.showLoader(true);
             try {
                 const snapshot = await getDocs(leadsCollectionRef);
-                const deletePromises = snapshot.docs.map(d => deleteDoc(doc(leadsCollectionRef, d.id)));
+                const deletePromises = snapshot.docs.map(d => deleteDoc(doc(leadsCollectionRef, d.id))); // Usar ref correcta
                 await Promise.all(deletePromises);
                 window.showMessage("Base de datos de leads limpiada (Historial conservado en nube).", false);
             } catch (e) {
@@ -488,7 +500,8 @@
              
              window.showLoader(true);
              try {
-                const docRef = doc(db, 'leads', leadIdToDelete); 
+                // Ruta correcta para eliminar
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'leads', leadIdToDelete); 
                 await deleteDoc(docRef);
                 window.showMessage("Lead eliminado correctamente.", false);
              } catch(e) {
@@ -787,7 +800,7 @@
     <header class="w-full max-w-7xl mb-8 flex justify-between items-center glass-panel rounded-2xl p-6">
         <div>
             <h1 class="text-3xl font-bold tracking-tight">Convertidor de WhatsApp a Leads</h1>
-            <p class="text-white/60 text-sm mt-1">Dpto. Comercial (versión 6.4)</p>
+            <p class="text-white/60 text-sm mt-1">Dpto. Comercial (versión 6.5)</p>
         </div>
         <div id="loader" class="hidden">
             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
