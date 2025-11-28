@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Procesador de Leads v6.4 - Conexión Garantizada</title>
+    <title>Procesador de Leads v6.5 - Dashboard Estable</title>
     <!-- Carga de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -138,12 +138,12 @@
     <!-- Carga de Firebase -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, query, onSnapshot, updateDoc, deleteDoc, doc, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, query, onSnapshot, updateDoc, deleteDoc, doc, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Configuración ---
-        const apiKey = ""; // La clave se inyecta en el entorno
-        const VALID_API_KEY_FALLBACK = "AIzaSyClcQiTJj91vzb0P5737owh4tUyJPLWgEA"; // Fallback por si acaso
+        // CLAVE RESTAURADA DEL CÓDIGO ORIGINAL (V5.8)
+        const ORIGINAL_API_KEY = "AIzaSyClcQiTJj91vzb0P5737owh4tUyJPLWgEA"; 
 
         const tecnicaturaMap = {
             'Desarrollo web': 1,
@@ -191,58 +191,40 @@
         let leadIdToEdit = null;
         let leadIdToDelete = null;
 
-        // --- Firebase Init (CORREGIDO + FALLBACK MANUAL) ---
+        // --- Firebase Init (RESTAURADO) ---
         async function setupFirebase() {
             try {
-                // 1. Intentar obtener configuración del entorno
-                let firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-                
-                // 2. Si no existe, usar FALLBACK HARDCODEADO (Para que funcione siempre)
-                if (!firebaseConfig) {
-                    console.warn("Usando configuración de respaldo (Fallback Mode)");
-                    firebaseConfig = {
-                        apiKey: "AIzaSyClcQiTJj91vzb0P5737owh4tUyJPLWgEA",
-                        authDomain: "cargadeleads.firebaseapp.com",
-                        projectId: "cargadeleads",
-                        storageBucket: "cargadeleads.firebasestorage.app",
-                        messagingSenderId: "744616190679",
-                        appId: "1:744616190679:web:af63cbf7b42ee455a30692"
-                    };
-                }
+                // Configuración manual exacta del código original
+                const firebaseConfig = {
+                    apiKey: ORIGINAL_API_KEY,
+                    authDomain: "cargadeleads.firebaseapp.com",
+                    projectId: "cargadeleads",
+                    storageBucket: "cargadeleads.firebasestorage.app",
+                    messagingSenderId: "744616190679",
+                    appId: "1:744616190679:web:af63cbf7b42ee455a30692"
+                };
 
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
-                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
-                // Autenticación con Token (Prioridad) o Anónimo
-                const initAuth = async () => {
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await signInWithCustomToken(auth, __initial_auth_token);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-                };
                 
-                await initAuth();
+                // IMPORTANTE: Ruta pública para que funcione en este entorno sin perder datos
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                
+                // Inicio de sesión directo anónimo
+                await signInAnonymously(auth);
+                console.log("Conectado como Anónimo");
 
-                // Listener de Estado de Autenticación
-                onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        // Conexión exitosa
-                        leadsCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'leads');
-                        console.log("Autenticado como:", user.uid);
-                        listenToAllLeads();
-                    } else {
-                        updateSyncStatus(false);
-                        console.warn("Usuario no autenticado");
-                    }
-                });
+                // Referencia a la colección segura
+                leadsCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'leads');
+                
+                // Iniciar escucha
+                listenToAllLeads();
 
             } catch (err) {
-                console.error("Firebase Error:", err);
+                console.error("Firebase Critical Error:", err);
                 updateSyncStatus(false);
-                showMessage("Error de Conexión: " + err.message, true);
+                showMessage("Error Crítico de Conexión: " + err.message, true);
             }
         }
 
@@ -261,12 +243,12 @@
                 // Ordenar: Más recientes primero
                 allLeads.sort((a, b) => (b.fechaCreacionTimestamp || 0) - (a.fechaCreacionTimestamp || 0));
                 
-                updateSyncStatus(true); // Conexión confirmada al recibir datos
+                updateSyncStatus(true); // ¡Conexión exitosa!
                 filterAndRender();
             }, (error) => {
                 console.error("Snapshot error:", error);
                 updateSyncStatus(false);
-                showMessage("Se perdió la conexión con la base de datos.", true);
+                showMessage("Conexión interrumpida.", true);
             });
         }
 
@@ -274,7 +256,7 @@
             const el = document.getElementById('syncStatus');
             const dot = document.getElementById('syncDot');
             if (connected) {
-                el.textContent = "Live Sync";
+                el.textContent = "Conectado";
                 el.classList.remove('text-red-400');
                 el.classList.add('text-green-400');
                 dot.classList.remove('bg-red-500', 'animate-none');
@@ -359,7 +341,7 @@
                     archivado: false 
                 };
                 
-                if (!leadsCollectionRef) throw new Error("Base de datos no conectada. Espera a que el indicador diga 'Live Sync'.");
+                if (!leadsCollectionRef) throw new Error("Base de datos no conectada.");
                 
                 await addDoc(leadsCollectionRef, newLead);
                 return true;
@@ -397,9 +379,9 @@
             const txt = input.value;
             if (!txt.trim()) return showMessage("Por favor, ingresa un texto.", true);
             
-            // Check connection first
-            if(document.getElementById('syncStatus').textContent !== "Live Sync") {
-                return showMessage("No hay conexión con la base de datos.", true);
+            // Verificación simple de conexión
+            if(!leadsCollectionRef) {
+                return showMessage("Esperando conexión a base de datos...", true);
             }
 
             showLoader(true);
@@ -627,7 +609,7 @@
 
         // --- IA Parser ---
         async function parseWithGemini(text, isImage, mimeType) {
-            const usedKey = apiKey || VALID_API_KEY_FALLBACK;
+            const usedKey = ORIGINAL_API_KEY;
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${usedKey}`;
             const parts = isImage 
                 ? [{ text: "Extrae datos JSON." }, { inlineData: { mimeType, data: text } }]
@@ -702,7 +684,7 @@
                 <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-sky-400 to-teal-400">
                     Convertidor de WhatsApp a Leads
                 </h1>
-                <p class="text-sm text-slate-400 mt-1">Dpto. Comercial • v6.4 Fix Final</p>
+                <p class="text-sm text-slate-400 mt-1">Dpto. Comercial • v6.5 Stable Core</p>
             </div>
             <!-- Indicador de Sincronización -->
             <div class="flex items-center gap-2 bg-slate-900/50 px-4 py-2 rounded-full border border-slate-700/50">
@@ -801,7 +783,7 @@
                 
                 <!-- Footer Tabla -->
                 <div class="p-2 bg-slate-900/40 border-t border-white/5 text-[10px] text-center text-slate-500 font-mono">
-                    Conectado a Firestore (Public Mode) • ID de Sesión: <script>document.write(typeof __app_id !== 'undefined' ? __app_id.substring(0,8) : 'DEV-MODE')</script>
+                    Conectado a Firestore (Mode: Core Stable) • ID de Sesión: <script>document.write(typeof __app_id !== 'undefined' ? __app_id.substring(0,8) : 'DEV-MODE')</script>
                 </div>
             </div>
         </div>
