@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Procesador de Leads v6.5 - Dashboard Estable</title>
+    <title>Procesador de Leads v6.6 - Dashboard Restaurado</title>
     <!-- Carga de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -142,7 +142,6 @@
         import { getFirestore, collection, addDoc, query, onSnapshot, updateDoc, deleteDoc, doc, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Configuración ---
-        // CLAVE RESTAURADA DEL CÓDIGO ORIGINAL (V5.8)
         const ORIGINAL_API_KEY = "AIzaSyClcQiTJj91vzb0P5737owh4tUyJPLWgEA"; 
 
         const tecnicaturaMap = {
@@ -191,10 +190,10 @@
         let leadIdToEdit = null;
         let leadIdToDelete = null;
 
-        // --- Firebase Init (RESTAURADO) ---
+        // --- Firebase Init (RESTAURADO CON RUTA ORIGINAL) ---
         async function setupFirebase() {
             try {
-                // Configuración manual exacta del código original
+                // Configuración manual exacta del código original que funcionaba
                 const firebaseConfig = {
                     apiKey: ORIGINAL_API_KEY,
                     authDomain: "cargadeleads.firebaseapp.com",
@@ -208,15 +207,14 @@
                 db = getFirestore(app);
                 auth = getAuth(app);
                 
-                // IMPORTANTE: Ruta pública para que funcione en este entorno sin perder datos
-                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-                
-                // Inicio de sesión directo anónimo
                 await signInAnonymously(auth);
                 console.log("Conectado como Anónimo");
 
-                // Referencia a la colección segura
-                leadsCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'leads');
+                // *** CORRECCIÓN CRÍTICA ***
+                // En v5.8 usabas 'leads' (ruta simple). En v6.5 cambié a 'artifacts/...'.
+                // Tu base de datos probablemente solo tiene permisos para 'leads'.
+                // REVERTIMOS A LA RUTA ORIGINAL PARA QUE FUNCIONE:
+                leadsCollectionRef = collection(db, 'leads'); 
                 
                 // Iniciar escucha
                 listenToAllLeads();
@@ -247,8 +245,13 @@
                 filterAndRender();
             }, (error) => {
                 console.error("Snapshot error:", error);
+                // Si el error es de permisos, es muy probable que sea por la ruta.
+                if (error.code === 'permission-denied') {
+                    showMessage("Error de Permisos: Verifica las reglas de Firestore.", true);
+                } else {
+                    showMessage("Conexión interrumpida: " + error.code, true);
+                }
                 updateSyncStatus(false);
-                showMessage("Conexión interrumpida.", true);
             });
         }
 
@@ -684,7 +687,7 @@
                 <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-sky-400 to-teal-400">
                     Convertidor de WhatsApp a Leads
                 </h1>
-                <p class="text-sm text-slate-400 mt-1">Dpto. Comercial • v6.5 Stable Core</p>
+                <p class="text-sm text-slate-400 mt-1">Dpto. Comercial • v6.6 Fix Ruta</p>
             </div>
             <!-- Indicador de Sincronización -->
             <div class="flex items-center gap-2 bg-slate-900/50 px-4 py-2 rounded-full border border-slate-700/50">
