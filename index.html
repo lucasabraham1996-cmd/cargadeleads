@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Procesador de Leads v6.7 - Final Release</title>
+    <title>Procesador de Leads v6.8 - Turbo & Detección</title>
     <!-- Carga de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -161,16 +161,21 @@
             'Estado', 'Vendedor Asignado', 'Fecha de Creación', 'Último Contacto', 'Observaciones'
         ];
         
-        // Prompt mejorado para Emails
+        // Prompt SUPER OPTIMIZADO y AGRESIVO para detección
         const systemPromptForGemini = `
-            Eres un asistente experto en data entry. Analiza el texto o imagen provista y extrae un objeto JSON con:
-            { "nombre": string, "email": string, "telefono": string, "tecnicatura": string, "preferencia_contacto": "whatsapp" | "telefono" | null }
+            Eres un motor de extracción de datos. Tu prioridad es la VELOCIDAD y la PRECISIÓN en la preferencia de contacto.
             
-            Reglas:
-            1. Nombre + Apellido -> campo 'nombre'.
-            2. Email: Busca patrones de correo (ej: usuario@dominio.com) en todo el texto. Si encuentras uno, úsalo.
-            3. Tecnicatura EXACTA: 'Desarrollo web', 'Administración de empresas', 'Marketing', 'Higiene y seguridad', 'Gestión inmobiliaria', 'Analista de sistemas', 'Ciencia de datos e IA', 'Recursos humanos'.
-            4. Contacto: 'wpp'/'mensaje'/'escribir' -> 'whatsapp'; 'llamar'/'voz'/'telefono' -> 'telefono'. Si no hay indicio claro, null.
+            Salida JSON estrictamente:
+            { "nombre": string, "email": string, "telefono": string, "tecnicatura": string, "preferencia_contacto": "whatsapp" | "telefono" | "whatsapp" }
+
+            REGLAS CRÍTICAS DE PREFERENCIA:
+            1. Si el usuario dice: "llámame", "llamada", "celular", "voz", "teléfono", "llamado" -> preferencia_contacto: "telefono".
+            2. Si el usuario dice: "escribime", "mensaje", "texto", "info por acá", "wpp", "whatsapp" -> preferencia_contacto: "whatsapp".
+            3. Si es una captura de chat y NO pide explícitamente llamada -> preferencia_contacto: "whatsapp" (asumir por defecto).
+            
+            OTRAS REGLAS:
+            - Nombre: Unifica Nombre y Apellido.
+            - Tecnicatura: Mapea a 'Desarrollo web', 'Administración de empresas', 'Marketing', 'Higiene y seguridad', 'Gestión inmobiliaria', 'Analista de sistemas', 'Ciencia de datos e IA', 'Recursos humanos'.
         `;
 
         const jsonSchemaForGemini = {
@@ -180,7 +185,7 @@
                 "email": { "type": "STRING" },
                 "telefono": { "type": "STRING" },
                 "tecnicatura": { "type": "STRING" },
-                "preferencia_contacto": { "type": "STRING", "enum": ["whatsapp", "telefono"], "nullable": true }
+                "preferencia_contacto": { "type": "STRING", "enum": ["whatsapp", "telefono"], "nullable": false }
             }
         };
 
@@ -278,13 +283,15 @@
         function updateStats() {
             const activeLeads = allLeads.filter(l => !l.archivado);
             const total = activeLeads.length;
-            const whatsapp = activeLeads.filter(l => l.preferencia_contacto === 'whatsapp').length;
-            const telefono = activeLeads.filter(l => l.preferencia_contacto === 'telefono').length;
+            
+            // Lógica de conteo insensible a mayúsculas/minúsculas para robustez
+            const whatsapp = activeLeads.filter(l => l.preferencia_contacto && l.preferencia_contacto.toLowerCase() === 'whatsapp').length;
+            const telefono = activeLeads.filter(l => l.preferencia_contacto && l.preferencia_contacto.toLowerCase() === 'telefono').length;
             
             const wppPct = total > 0 ? Math.round((whatsapp / total) * 100) : 0;
             const telPct = total > 0 ? Math.round((telefono / total) * 100) : 0;
 
-            animateValue("statTotal", parseInt(document.getElementById("statTotal").innerText), total, 500);
+            animateValue("statTotal", parseInt(document.getElementById("statTotal").innerText) || 0, total, 500);
             document.getElementById("statWhatsapp").textContent = `${wppPct}% (${whatsapp})`;
             document.getElementById("statPhone").textContent = `${telPct}% (${telefono})`;
         }
@@ -292,6 +299,7 @@
         function animateValue(id, start, end, duration) {
             if (start === end) return;
             const obj = document.getElementById(id);
+            if(!obj) return;
             let startTimestamp = null;
             const step = (timestamp) => {
                 if (!startTimestamp) startTimestamp = timestamp;
@@ -302,7 +310,7 @@
             window.requestAnimationFrame(step);
         }
 
-        // --- Guardado Seguro ---
+        // --- Guardado Seguro y Rápido ---
         async function processAndSaveLead(parsedData, showDuplicateMessage = false) {
             if (!parsedData) return false;
             
@@ -320,7 +328,6 @@
                     day: '2-digit', month: '2-digit', year: 'numeric'
                 });
 
-                // Construcción de observaciones mejorada
                 const observacionesAuto = buildObservaciones(parsedData);
 
                 const newLead = {
@@ -334,17 +341,22 @@
                     fechaCreacionTimestamp: timestamp,
                     ultimoContacto: '',
                     observaciones: observacionesAuto,
-                    preferencia_contacto: parsedData.preferencia_contacto || null,
+                    preferencia_contacto: parsedData.preferencia_contacto || 'whatsapp', // Default si viene null para asegurar conteo
                     archivado: false 
                 };
                 
                 if (!leadsCollectionRef) throw new Error("Base de datos no conectada.");
                 
-                await addDoc(leadsCollectionRef, newLead);
-                return true;
+                // Guardar sin await bloqueante para UX, pero con catch para errores
+                addDoc(leadsCollectionRef, newLead).catch(err => {
+                    console.error("Error en background save:", err);
+                    showMessage("Error guardando en segundo plano.", true);
+                });
+                
+                return true; // Retornar true inmediatamente para la UI
             } catch (err) {
-                console.error("Error al guardar:", err);
-                showMessage("Error al guardar: " + err.message, true);
+                console.error("Error al procesar:", err);
+                showMessage("Error al procesar: " + err.message, true);
                 return false;
             }
         }
@@ -353,10 +365,13 @@
             const prefix = "Ingresa por WhatsApp Comercial: ";
             let content = "Consulta general.";
             
-            if (parsedData.preferencia_contacto === 'whatsapp') {
+            // Normalizar a minusculas para comparación segura
+            const pref = (parsedData.preferencia_contacto || '').toLowerCase();
+
+            if (pref === 'whatsapp') {
                 content = "Manifiesta que la contacten por WhatsApp.";
-            } else if (parsedData.preferencia_contacto === 'telefono') {
-                content = "Manifiesta que prefiere por esa vía.";
+            } else if (pref === 'telefono') {
+                content = "Manifiesta que prefiere por esa vía."; // "Esa vía" = llamada
             }
             
             return `${prefix}${content}`;
@@ -390,7 +405,7 @@
                 const saved = await processAndSaveLead(parsed, true);
                 if (saved) {
                     input.value = '';
-                    showMessage("¡Lead procesado y guardado!", false);
+                    showMessage("¡Lead procesado! Guardando en segundo plano...", false);
                 }
             } catch (e) { 
                 showMessage(e.message, true); 
@@ -399,7 +414,7 @@
             }
         };
 
-        // Descargar Excel (CORREGIDO: IDs en Tecnicatura)
+        // Descargar Excel (IDs en Tecnicatura)
         window.handleDescargar = () => {
             if (displayLeads.length === 0) return;
             
@@ -408,7 +423,6 @@
                 'Nombre Completo': l.nombreCompleto,
                 'Email': l.email,
                 'Teléfono': l.telefono,
-                // AQUÍ EL CAMBIO: Exportamos l.tecnicaturaId directamente (el ID numérico)
                 'Tecnicatura': l.tecnicaturaId || '',
                 'Estado': l.estado,
                 'Vendedor Asignado': l.vendedorAsignado,
@@ -685,7 +699,7 @@
                 <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-sky-400 to-teal-400">
                     Convertidor de WhatsApp a Leads
                 </h1>
-                <p class="text-sm text-slate-400 mt-1">Dpto. Comercial • v6.7 Final Release</p>
+                <p class="text-sm text-slate-400 mt-1">Dpto. Comercial • v6.8 Turbo & Detección</p>
             </div>
             <!-- Indicador de Sincronización -->
             <div class="flex items-center gap-2 bg-slate-900/50 px-4 py-2 rounded-full border border-slate-700/50">
