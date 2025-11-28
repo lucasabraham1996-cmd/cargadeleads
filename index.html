@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Procesador de Leads v6.2 - Dashboard Edition</title>
+    <title>Procesador de Leads v6.3 - Conexión Estable</title>
     <!-- Carga de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -16,7 +16,7 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            /* Degradado Azul/Verde/Turquesa profundo como pediste */
+            /* Degradado Azul/Verde/Turquesa profundo */
             background: radial-gradient(circle at top left, #0f172a, #0e7490, #064e3b);
             background-size: cover;
             min-height: 100vh;
@@ -39,7 +39,7 @@
             background: rgba(255, 255, 255, 0.4); 
         }
 
-        /* Glassmorphism Refinado (Estilo Dashboard) */
+        /* Glassmorphism Refinado */
         .glass-panel {
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(16px);
@@ -51,7 +51,7 @@
 
         /* Tarjetas de Estadísticas */
         .stat-card {
-            background: rgba(15, 23, 42, 0.6); /* Fondo oscuro semitransparente */
+            background: rgba(15, 23, 42, 0.6);
             border: 1px solid rgba(255, 255, 255, 0.05);
             border-radius: 0.75rem;
             transition: transform 0.2s, background 0.2s;
@@ -71,7 +71,7 @@
         }
         .dashboard-input:focus {
             background: rgba(0, 0, 0, 0.5);
-            border-color: #38bdf8; /* Sky blue */
+            border-color: #38bdf8;
             outline: none;
             box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
         }
@@ -138,11 +138,12 @@
     <!-- Carga de Firebase -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, onSnapshot, updateDoc, deleteDoc, doc, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Configuración ---
-        const VALID_API_KEY = "AIzaSyClcQiTJj91vzb0P5737owh4tUyJPLWgEA"; 
+        const apiKey = ""; // La clave se inyecta en el entorno
+        const VALID_API_KEY_FALLBACK = "AIzaSyClcQiTJj91vzb0P5737owh4tUyJPLWgEA"; // Fallback por si acaso
 
         const tecnicaturaMap = {
             'Desarrollo web': 1,
@@ -190,33 +191,50 @@
         let leadIdToEdit = null;
         let leadIdToDelete = null;
 
-        // --- Firebase Init (Robust) ---
+        // --- Firebase Init (CORREGIDO) ---
         async function setupFirebase() {
             try {
-                const firebaseConfig = {
-                    apiKey: VALID_API_KEY,
-                    authDomain: "cargadeleads.firebaseapp.com",
-                    projectId: "cargadeleads",
-                    storageBucket: "cargadeleads.firebasestorage.app", 
-                    messagingSenderId: "744616190679",
-                    appId: "1:744616190679:web:af63cbf7b42ee455a30692"
-                };
+                // Usar configuración inyectada por el entorno si existe, sino un fallback (para pruebas locales)
+                const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
                 
+                if (!firebaseConfig) {
+                    throw new Error("Configuración de Firebase no encontrada. El entorno no proveyó las credenciales.");
+                }
+
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
-                
-                await signInAnonymously(auth);
-                
-                // Usamos AppID del entorno para separar datos por usuario/sesión del Canvas
                 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-                leadsCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'leads');
+
+                // Autenticación con Token (Prioridad) o Anónimo
+                const initAuth = async () => {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                };
                 
-                console.log("Firebase conectado. Escuchando en:", leadsCollectionRef.path);
-                listenToAllLeads();
+                await initAuth();
+
+                // Listener de Estado de Autenticación
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        // Conexión exitosa, establecer referencia a la colección
+                        // IMPORTANTE: Ruta estricta para permisos
+                        leadsCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'leads');
+                        console.log("Autenticado como:", user.uid);
+                        listenToAllLeads();
+                    } else {
+                        updateSyncStatus(false);
+                        console.warn("Usuario no autenticado");
+                    }
+                });
+
             } catch (err) {
                 console.error("Firebase Error:", err);
-                showMessage("Error de Conexión: Recarga la página.", true);
+                updateSyncStatus(false);
+                showMessage("Error de Conexión: " + err.message, true);
             }
         }
 
@@ -235,12 +253,12 @@
                 // Ordenar: Más recientes primero
                 allLeads.sort((a, b) => (b.fechaCreacionTimestamp || 0) - (a.fechaCreacionTimestamp || 0));
                 
-                updateSyncStatus(true);
+                updateSyncStatus(true); // Conexión confirmada al recibir datos
                 filterAndRender();
             }, (error) => {
                 console.error("Snapshot error:", error);
                 updateSyncStatus(false);
-                showMessage("Perdida conexión con base de datos.", true);
+                showMessage("Se perdió la conexión con la base de datos.", true);
             });
         }
 
@@ -252,7 +270,7 @@
                 el.classList.remove('text-red-400');
                 el.classList.add('text-green-400');
                 dot.classList.remove('bg-red-500', 'animate-none');
-                dot.classList.add('bg-green-400', 'animate-pulse'); // Custom animation below handles pulsing
+                dot.classList.add('bg-green-400', 'animate-pulse');
             } else {
                 el.textContent = "Desconectado";
                 el.classList.add('text-red-400');
@@ -263,10 +281,7 @@
         }
 
         function filterAndRender() {
-            // Filtrar
             displayLeads = allLeads.filter(l => showArchived ? l.archivado === true : !l.archivado);
-            
-            // Actualizar UI
             updateStats();
             renderTable();
             updateActionButtons();
@@ -279,7 +294,6 @@
             const whatsapp = activeLeads.filter(l => l.preferencia_contacto === 'whatsapp').length;
             const telefono = activeLeads.filter(l => l.preferencia_contacto === 'telefono').length;
             
-            // Porcentajes
             const wppPct = total > 0 ? Math.round((whatsapp / total) * 100) : 0;
             const telPct = total > 0 ? Math.round((telefono / total) * 100) : 0;
 
@@ -337,15 +351,13 @@
                     archivado: false 
                 };
                 
-                // Asegurar referencia
-                if (!leadsCollectionRef) throw new Error("Base de datos no inicializada");
+                if (!leadsCollectionRef) throw new Error("Base de datos no conectada. Espera a que el indicador diga 'Live Sync'.");
                 
                 await addDoc(leadsCollectionRef, newLead);
-                console.log("Documento guardado en Firestore");
                 return true;
             } catch (err) {
                 console.error("Error al guardar:", err);
-                showMessage("Error al guardar en base de datos: " + err.message, true);
+                showMessage("Error al guardar: " + err.message, true);
                 return false;
             }
         }
@@ -377,6 +389,11 @@
             const txt = input.value;
             if (!txt.trim()) return showMessage("Por favor, ingresa un texto.", true);
             
+            // Check connection first
+            if(document.getElementById('syncStatus').textContent !== "Live Sync") {
+                return showMessage("No hay conexión con la base de datos.", true);
+            }
+
             showLoader(true);
             try {
                 const parsed = await parseWithGemini(txt);
@@ -488,7 +505,7 @@
             setTimeout(() => b.classList.add('hidden'), 5000);
         }
 
-        // Helpers de Edición/Borrado (Lógica igual a v6.1 pero conectada al UI nuevo)
+        // Helpers de Edición/Borrado
         window.handleEditClick = (id) => {
             const lead = allLeads.find(l => l.id === id);
             if (!lead) return;
@@ -602,7 +619,8 @@
 
         // --- IA Parser ---
         async function parseWithGemini(text, isImage, mimeType) {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${VALID_API_KEY}`;
+            const usedKey = apiKey || VALID_API_KEY_FALLBACK;
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${usedKey}`;
             const parts = isImage 
                 ? [{ text: "Extrae datos JSON." }, { inlineData: { mimeType, data: text } }]
                 : [{ text }];
@@ -676,7 +694,7 @@
                 <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-sky-400 to-teal-400">
                     Convertidor de WhatsApp a Leads
                 </h1>
-                <p class="text-sm text-slate-400 mt-1">Dpto. Comercial • v6.2 Dashboard Edition</p>
+                <p class="text-sm text-slate-400 mt-1">Dpto. Comercial • v6.3 Fix Conexión</p>
             </div>
             <!-- Indicador de Sincronización -->
             <div class="flex items-center gap-2 bg-slate-900/50 px-4 py-2 rounded-full border border-slate-700/50">
