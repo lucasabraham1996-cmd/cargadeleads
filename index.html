@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Convertidor de WhatsApp a Leads v6.9 (Stable)</title>
+    <title>Convertidor de WhatsApp a Leads v6.10 (Fix Paste)</title>
     <!-- Carga de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -205,11 +205,11 @@
         let leadIdToDelete = null; 
         let leadIdToEdit = null;
         let statsDocRef = null; 
-        let unsubscribeLeads = null; // Para limpieza de listeners
+        let unsubscribeLeads = null; 
         let unsubscribeStats = null;
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         
-        // --- Firebase Init (Stabilized) ---
+        // --- Firebase Init ---
         async function setupFirebase() {
             try {
                 const firebaseConfig = {
@@ -226,28 +226,22 @@
                 db = getFirestore(app);
                 auth = getAuth(app);
 
-                // Listener de estado de autenticación (Una sola vez)
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
-                        // Limpiar listeners antiguos si existen
                         if (unsubscribeLeads) unsubscribeLeads();
                         if (unsubscribeStats) unsubscribeStats();
 
-                        // Configurar referencias seguras
                         leadsCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'leads');
                         statsDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'statistics', 'global_counters');
                         
-                        // Iniciar nuevos listeners
                         listenToAllLeads();
                         listenToStats();
-                        document.getElementById('loader').classList.add('hidden'); // Ocultar loader al conectar
+                        document.getElementById('loader').classList.add('hidden'); 
                     } else {
-                        // Si se desconecta, reintentar anónimo
                         signInAnonymously(auth).catch(e => console.error("Re-auth failed", e));
                     }
                 });
 
-                // Iniciar proceso de autenticación inicial
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
@@ -272,7 +266,6 @@
                 snapshot.forEach((doc) => {
                     currentLeads.push({ id: doc.id, ...doc.data() });
                 });
-                // Ordenar descendente
                 currentLeads.sort((a, b) => (b.fechaCreacionTimestamp || 0) - (a.fechaCreacionTimestamp || 0));
                 renderTable();
                 
@@ -290,7 +283,6 @@
                 }
             }, (error) => {
                 console.error("Listener Error:", error);
-                // No mostrar alerta al usuario por reconexiones internas silenciosas
                 if (error.code !== 'permission-denied') {
                     window.showMessage("Sincronizando...", false); 
                 }
@@ -305,7 +297,6 @@
                 if (docSnapshot.exists()) {
                     updateStatsUI(docSnapshot.data());
                 } else {
-                    // Inicializar si no existe
                     setDoc(statsDocRef, { total: 0, wpp: 0, call: 0 }, { merge: true })
                         .catch(e => console.log("Stats init ignored", e));
                     updateStatsUI({ total: 0, wpp: 0, call: 0 });
@@ -340,13 +331,11 @@
             }
         };
 
-        // *** LOGICA DE DUPLICADOS MEJORADA ***
+        // --- Duplicates & Save ---
         function findDuplicateLead(email, phone) {
             const newEmail = email ? email.trim() : '';
             const newPhone = phone ? phone.trim() : '';
             if (!newEmail && !newPhone) return null;
-            
-            // Buscar lead existente
             return currentLeads.find(lead => 
                 (newEmail && lead.email === newEmail) || 
                 (newPhone && lead.telefono === newPhone)
@@ -360,11 +349,9 @@
             }
             if (!parsedData) return false;
             
-            // 1. Chequeo de Duplicados Inteligente
             const existingLead = findDuplicateLead(parsedData.email, parsedData.telefono);
             
             if (existingLead) {
-                // *** ESTRATEGIA UPDATE ***: Si existe, actualizamos su 'Último Contacto' en lugar de fallar
                 const timestamp = Date.now();
                 const fechaFormateada = new Date(timestamp).toLocaleDateString('es-AR', {
                     day: '2-digit', month: '2-digit', year: 'numeric'
@@ -379,12 +366,11 @@
                     window.showMessage(`Lead ya existía (${existingLead.nombreCompleto}). Se actualizó su último contacto.`, false);
                     return true;
                 } catch (e) {
-                    window.showMessage("Lead duplicado detectado, pero falló la actualización.", true);
+                    window.showMessage("Lead duplicado detectado.", true);
                     return false;
                 }
             }
             
-            // 2. Si es nuevo, Guardar
             try {
                 const tecnicaturaNombre = parsedData.tecnicatura || '';
                 const tecnicaturaId = tecnicaturaMap[tecnicaturaNombre] || '';
@@ -429,14 +415,12 @@
             const messageText = document.getElementById('messageText');
             const messageBox = document.getElementById('messageBox');
             messageText.textContent = msg;
-            // Usamos colores de fondo sólidos con transparencia para legibilidad
             if (isError) {
                 messageBox.className = "glass-panel fixed top-24 right-8 max-w-sm z-50 p-4 rounded-xl flex justify-between items-center bg-red-900/80 border border-red-500 text-white shadow-xl backdrop-blur-md";
             } else {
                 messageBox.className = "glass-panel fixed top-24 right-8 max-w-sm z-50 p-4 rounded-xl flex justify-between items-center bg-emerald-900/80 border border-emerald-500 text-white shadow-xl backdrop-blur-md";
             }
             messageBox.classList.remove('hidden');
-            // Auto ocultar éxito después de 5s
             if(!isError) setTimeout(() => window.hideMessage(), 5000);
         };
 
@@ -492,28 +476,33 @@
                 finally { window.showLoader(false); }
             };
 
-            // Pegado de imágenes
+            // *** FIX PASTE EVENT ***
             document.getElementById('mensajeInput').addEventListener('paste', (e) => {
                 const items = (e.clipboardData || window.clipboardData).items;
                 for (let i = 0; i < items.length; i++) {
                     if (items[i].kind === 'file' && items[i].type.startsWith('image/')) {
                         e.preventDefault();
+                        
+                        // Capturar archivo inmediatamente
+                        const file = items[i].getAsFile();
+                        const mimeType = file.type; // Guardar tipo aquí
+                        
                         window.showMessage("Procesando imagen pegada...", false);
                         const reader = new FileReader();
                         reader.onload = async (evt) => {
                             window.showLoader(true);
                             try {
-                                const parsed = await parseImageWithGemini(evt.target.result.split(',')[1], items[i].type);
+                                const parsed = await parseImageWithGemini(evt.target.result.split(',')[1], mimeType);
                                 if(await processAndSaveLead(parsed)) window.showMessage("Imagen procesada.", false);
                             } catch(err) { window.showMessage("Error imagen: " + err.message, true); }
                             finally { window.showLoader(false); }
                         };
-                        reader.readAsDataURL(items[i].getAsFile());
+                        reader.readAsDataURL(file);
                     }
                 }
             });
 
-            // Resto de botones (Excel, Limpiar, Descargar, etc.) - Igual que antes
+            // Resto de botones
             document.getElementById('limpiarBtn').onclick = () => document.getElementById('confirmModal').classList.remove('hidden');
             window.confirmLimpiarDatos = async () => {
                 document.getElementById('confirmModal').classList.add('hidden'); window.showLoader(true);
@@ -546,7 +535,10 @@
                         <td class="p-3 text-xs text-white/60">${lead.fechaCreacion}</td>
                         <td class="p-3 text-sm">${obsHtml}</td>
                         <td class="p-3 text-center">
-                            <button onclick="deleteLead('${lead.id}')" class="text-red-300 hover:text-white hover:bg-red-500/30 p-1 rounded transition">🗑</button>
+                            <div class="flex justify-center gap-2">
+                                <button onclick="window.openEditModal('${lead.id}')" class="text-blue-300 hover:text-white p-1 hover:bg-blue-500/40 rounded transition" title="Editar">✏️</button>
+                                <button onclick="deleteLead('${lead.id}')" class="text-red-300 hover:text-white hover:bg-red-500/30 p-1 rounded transition" title="Borrar">🗑</button>
+                            </div>
                         </td>
                     `;
                     body.appendChild(tr);
@@ -563,7 +555,7 @@
             document.getElementById('descargarBtn').onclick = () => {
                  const data = currentLeads.map(l => ({
                      'ID': l.id, 'Nombre': l.nombreCompleto, 'Email': l.email, 'Tel': l.telefono,
-                     'Tecnicatura': l.tecnicaturaId, 'Obs': l.observaciones.includes('WhatsApp') ? 'Exportado - Prefiere WPP' : (l.observaciones.includes('Llamada') ? 'Exportado - Prefiere Llamada' : 'Exportado')
+                     'Tecnicatura': l.tecnicaturaId, 'Obs': l.observaciones.includes('WhatsApp') ? 'Exportado desde WhatsApp Comercial - Prefiere info a través de WhatsApp' : (l.observaciones.includes('Llamada') ? 'Exportado desde WhatsApp Comercial - Prefiere llamado teléfonico para asesoramiento' : 'Exportado desde WhatsApp Comercial')
                  }));
                  const ws = XLSX.utils.json_to_sheet(data);
                  const wb = XLSX.utils.book_new();
@@ -586,7 +578,7 @@
     <header class="w-full max-w-7xl mb-8 flex justify-between items-center glass-panel rounded-2xl p-6">
         <div>
             <h1 class="text-3xl font-bold tracking-tight">Convertidor de WhatsApp a Leads</h1>
-            <p class="text-white/60 text-sm mt-1">Dpto. Comercial (versión 6.9 Stable)</p>
+            <p class="text-white/60 text-sm mt-1">Dpto. Comercial (versión 6.10 Fix Paste)</p>
         </div>
         <div id="loader" class="hidden"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div></div>
     </header>
@@ -682,7 +674,39 @@
         </div>
     </div>
     
-    <!-- Excel Preview Modal (Hidden Logic for Brevity but functional via handlers) -->
+    <!-- Edit Modal (Glass) -->
+    <div id="editModal" class="hidden fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/50">
+        <div class="glass-panel p-8 rounded-3xl w-full max-w-md">
+             <h3 class="text-xl font-bold mb-4">Editar Lead</h3>
+             <div class="space-y-4">
+                 <div><label class="block text-xs uppercase text-white/60 mb-1">Nombre</label><input type="text" id="editNombre" class="glass-input w-full p-2 rounded-lg"></div>
+                 <div><label class="block text-xs uppercase text-white/60 mb-1">Email</label><input type="email" id="editEmail" class="glass-input w-full p-2 rounded-lg"></div>
+                 <div><label class="block text-xs uppercase text-white/60 mb-1">Teléfono</label><input type="text" id="editTelefono" class="glass-input w-full p-2 rounded-lg"></div>
+                 <div>
+                     <label class="block text-xs uppercase text-white/60 mb-1">Tecnicatura</label>
+                     <select id="editTecnicatura" class="glass-input w-full p-2 rounded-lg">
+                         <option value="">-- Seleccionar --</option>
+                         <option value="1">Desarrollo web</option><option value="2">Administración de empresas</option>
+                         <option value="3">Marketing</option><option value="4">Higiene y seguridad</option>
+                         <option value="5">Gestión inmobiliaria</option><option value="6">Analista de sistemas</option>
+                         <option value="7">Ciencia de datos e IA</option><option value="8">Recursos humanos</option>
+                     </select>
+                 </div>
+                 <div>
+                     <label class="block text-xs uppercase text-white/60 mb-1">Preferencia Contacto</label>
+                     <select id="editPreferencia" class="glass-input w-full p-2 rounded-lg">
+                         <option value="WhatsApp">WhatsApp</option><option value="Llamada">Llamada</option><option value="Indiferente">Indiferente</option>
+                     </select>
+                 </div>
+             </div>
+             <div class="flex justify-end gap-3 mt-6">
+                <button class="close-modal glass-button px-4 py-2 rounded-lg text-sm">Cancelar</button>
+                <button onclick="window.confirmEditLead()" class="btn-primary glass-button px-4 py-2 rounded-lg text-white">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Excel Preview Modal -->
     <div id="excelPreviewModal" class="hidden fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/60 p-4">
         <div class="glass-panel p-6 rounded-3xl w-full max-w-4xl max-h-[80vh] flex flex-col">
             <h3 class="text-xl font-bold mb-4">Vista Previa Excel</h3>
