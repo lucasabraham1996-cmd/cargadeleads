@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Convertidor de WhatsApp a Leads v6.5 (Stats Fix)</title>
+    <title>Convertidor de WhatsApp a Leads v6.6 (Auth Fix)</title>
     <!-- Carga de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -155,7 +155,7 @@
     <!-- Carga de Firebase -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, onSnapshot, setLogLevel, getDocs, deleteDoc, updateDoc, doc, setDoc, increment, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Configuración ---
@@ -224,10 +224,13 @@
                 db = getFirestore(app);
                 auth = getAuth(app);
 
-                // Esperar autenticación
-                await signInAnonymously(auth);
+                // *** AUTH FIX: Usar token si existe, sino anónimo ***
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
                 
-                // *** CORRECCIÓN DE RUTAS ***
                 // Usamos /artifacts/{appId}/public/data/... para garantizar permisos de escritura
                 leadsCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'leads');
                 statsDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'statistics', 'global_counters');
@@ -270,7 +273,7 @@
                 }
             }, (error) => {
                 console.error("Error listening to leads:", error);
-                window.showMessage("Error leyendo leads: " + error.message, true);
+                window.showMessage("Error leyendo leads (Permisos): " + error.message, true);
             });
         }
 
@@ -284,7 +287,7 @@
                     updateStatsUI(stats);
                 } else {
                     // Si no existe, inicializarlo (el primer usuario lo crea)
-                    setDoc(statsDocRef, { total: 0, wpp: 0, call: 0 })
+                    setDoc(statsDocRef, { total: 0, wpp: 0, call: 0 }, { merge: true })
                         .catch(e => console.log("Init stats skipped or failed", e));
                     updateStatsUI({ total: 0, wpp: 0, call: 0 });
                 }
@@ -323,7 +326,7 @@
                 await setDoc(statsDocRef, updates, { merge: true });
             } catch (e) {
                 console.error("Error updating stats:", e);
-                window.showMessage("No se pudo actualizar el contador: " + e.message, true);
+                // No mostrar error al usuario por stats, para no bloquear flujo principal
             }
         }
 
@@ -800,7 +803,7 @@
     <header class="w-full max-w-7xl mb-8 flex justify-between items-center glass-panel rounded-2xl p-6">
         <div>
             <h1 class="text-3xl font-bold tracking-tight">Convertidor de WhatsApp a Leads</h1>
-            <p class="text-white/60 text-sm mt-1">Dpto. Comercial (versión 6.5)</p>
+            <p class="text-white/60 text-sm mt-1">Dpto. Comercial (versión 6.6)</p>
         </div>
         <div id="loader" class="hidden">
             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
