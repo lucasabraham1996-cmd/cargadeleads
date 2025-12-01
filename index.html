@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Procesador de Leads v6.9 - Final Stable</title>
+    <title>Procesador de Leads v7.2 - Precision Fix</title>
     <!-- Carga de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -16,30 +16,19 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            /* Degradado Azul/Verde/Turquesa profundo */
             background: radial-gradient(circle at top left, #0f172a, #0e7490, #064e3b);
             background-size: cover;
             min-height: 100vh;
             color: #e2e8f0;
         }
 
-        /* Scrollbar Personalizado */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: rgba(0, 0, 0, 0.1); 
-        }
-        ::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.2); 
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.4); 
-        }
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.1); }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.4); }
 
-        /* Glassmorphism Refinado */
+        /* Glassmorphism */
         .glass-panel {
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(16px);
@@ -49,7 +38,6 @@
             border-radius: 1rem;
         }
 
-        /* Tarjetas de Estadísticas */
         .stat-card {
             background: rgba(15, 23, 42, 0.6);
             border: 1px solid rgba(255, 255, 255, 0.05);
@@ -62,7 +50,6 @@
             border-color: rgba(255, 255, 255, 0.2);
         }
 
-        /* Inputs */
         .dashboard-input {
             background: rgba(0, 0, 0, 0.3);
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -75,11 +62,8 @@
             outline: none;
             box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
         }
-        .dashboard-input::placeholder {
-            color: rgba(255, 255, 255, 0.4);
-        }
+        .dashboard-input::placeholder { color: rgba(255, 255, 255, 0.4); }
 
-        /* Botones */
         .btn-primary {
             background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
             border: 1px solid rgba(255,255,255,0.1);
@@ -92,11 +76,8 @@
             transform: translateY(-1px);
             box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
         }
-        .btn-primary:active {
-            transform: translateY(0);
-        }
+        .btn-primary:active { transform: translateY(0); }
 
-        /* Tabla */
         .table-header {
             background: rgba(15, 23, 42, 0.9);
             color: #94a3b8;
@@ -109,16 +90,9 @@
             border-bottom: 1px solid rgba(255, 255, 255, 0.05);
             transition: background 0.15s;
         }
-        .table-row:hover {
-            background: rgba(255, 255, 255, 0.05);
-        }
-        .table-cell {
-            padding: 0.75rem 1rem;
-            font-size: 0.875rem;
-            color: #cbd5e1;
-        }
+        .table-row:hover { background: rgba(255, 255, 255, 0.05); }
+        .table-cell { padding: 0.75rem 1rem; font-size: 0.875rem; color: #cbd5e1; }
 
-        /* Animaciones */
         @keyframes pulse-green {
             0% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7); }
             70% { box-shadow: 0 0 0 6px rgba(74, 222, 128, 0); }
@@ -135,7 +109,6 @@
         }
     </style>
 
-    <!-- Carga de Firebase -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -161,49 +134,29 @@
             'Estado', 'Vendedor Asignado', 'Fecha de Creación', 'Último Contacto', 'Observaciones'
         ];
         
-        // Prompt RECARGADO con inteligencia de sinónimos y abreviaturas
+        // Prompt mejorado: Énfasis en detección de carrera y preferencia neutral
         const systemPromptForGemini = `
-            Eres un motor de extracción de datos experto en interpretar lenguaje natural informal y abreviaturas académicas.
+            Eres un experto en clasificación de leads educativos.
             
-            Tu objetivo es normalizar la entrada a un JSON estricto:
-            { "nombre": string, "email": string, "telefono": string, "tecnicatura": string, "preferencia_contacto": "whatsapp" | "telefono" | "whatsapp" }
+            TAREA 1: CARRERA (CRÍTICO)
+            Identifica la carrera de interés basándote en palabras clave, sinónimos o carreras afines.
+            Debes mapear la intención a uno de estos nombres ESTÁNDAR:
+            - "Desarrollo web" (programación, full stack, frontend, sistemas web)
+            - "Administración de empresas" (adm, negocios, gestión, contable, pyme, asistente)
+            - "Marketing" (mkt, ventas, comercialización, redes sociales, publicidad)
+            - "Higiene y seguridad" (hys, seguridad industrial, prevención)
+            - "Gestión inmobiliaria" (martillero, corredor, propiedades, real estate)
+            - "Analista de sistemas" (informática, computación, soporte it, técnico pc)
+            - "Ciencia de datos e IA" (big data, machine learning, análisis de datos)
+            - "Recursos humanos" (rrhh, personal, talento humano)
+            
+            TAREA 2: CONTACTO
+            - "telefono": Si menciona llamar, celular, voz.
+            - "whatsapp": Si menciona escribir, wpp, mensaje.
+            - null: Si NO hay preferencia explícita. NO ASUMIR NADA.
 
-            *** LÓGICA DE MAPEO DE CARRERAS (SUPER INTELIGENTE) ***
-            Debes detectar el interés y mapearlo EXACTAMENTE a uno de estos nombres normalizados, entendiendo sus variantes:
-
-            1. 'Desarrollo web' 
-               <- Detectar si menciona: "programacion", "web", "full stack", "dw", "desarrollo", "frontend", "backend", "dev", "codigo", "sitios web".
-            
-            2. 'Administración de empresas' 
-               <- Detectar si menciona: "adm", "admon", "administracion", "ae", "empresas", "admin", "gestión de empresas", "business", "ade", "adm de empresas".
-            
-            3. 'Marketing' 
-               <- Detectar si menciona: "mkt", "mercadotecnia", "marketing digital", "comercialización", "ventas", "mark", "mk".
-            
-            4. 'Higiene y seguridad' 
-               <- Detectar si menciona: "hys", "h&s", "seguridad", "higiene", "seguridad e higiene", "syh", "prevencion", "sh", "seg e hig".
-            
-            5. 'Gestión inmobiliaria' 
-               <- Detectar si menciona: "inmobiliaria", "corredor", "martillero", "bienes raices", "propiedades", "tasador", "gestion inm", "inmuebles".
-            
-            6. 'Analista de sistemas' 
-               <- Detectar si menciona: "sistemas", "analista", "computacion", "informatica", "ads", "software", "tecnico en sistemas", "asi".
-            
-            7. 'Ciencia de datos e IA' 
-               <- Detectar si menciona: "datos", "data", "ia", "inteligencia artificial", "ciencia de datos", "data science", "analisis de datos", "big data".
-            
-            8. 'Recursos humanos' 
-               <- Detectar si menciona: "rrhh", "rh", "personal", "talento", "human resources", "capital humano", "recursos".
-
-            Si no encuentras ninguna carrera clara, devuelve cadena vacía "".
-
-            *** PREFERENCIAS ***
-            - 'telefono': "llámame", "llamada", "celular", "voz", "teléfono", "llamado".
-            - 'whatsapp': "escribime", "mensaje", "texto", "info por acá", "wpp", "whatsapp", o es captura de chat.
-            
-            *** DATOS PERSONALES ***
-            - Nombre: Unifica si vienen separados.
-            - Email: Busca patrones de correo agresivamente.
+            JSON SALIDA:
+            { "nombre": string, "email": string, "telefono": string, "tecnicatura": string, "preferencia_contacto": "whatsapp" | "telefono" | null }
         `;
 
         const jsonSchemaForGemini = {
@@ -213,7 +166,7 @@
                 "email": { "type": "STRING" },
                 "telefono": { "type": "STRING" },
                 "tecnicatura": { "type": "STRING" },
-                "preferencia_contacto": { "type": "STRING", "enum": ["whatsapp", "telefono"], "nullable": false }
+                "preferencia_contacto": { "type": "STRING", "enum": ["whatsapp", "telefono"], "nullable": true }
             }
         };
 
@@ -255,29 +208,20 @@
             }
         }
 
-        // --- Listener en Tiempo Real ---
+        // --- Listener ---
         function listenToAllLeads() {
             if (!leadsCollectionRef) return;
-
             const q = query(leadsCollectionRef);
-            
             onSnapshot(q, (snapshot) => {
                 allLeads = [];
                 snapshot.forEach((doc) => {
                     allLeads.push({ id: doc.id, ...doc.data() });
                 });
-                
                 allLeads.sort((a, b) => (b.fechaCreacionTimestamp || 0) - (a.fechaCreacionTimestamp || 0));
-                
                 updateSyncStatus(true);
                 filterAndRender();
             }, (error) => {
                 console.error("Snapshot error:", error);
-                if (error.code === 'permission-denied') {
-                    showMessage("Error de Permisos: Verifica las reglas de Firestore.", true);
-                } else {
-                    showMessage("Conexión interrumpida: " + error.code, true);
-                }
                 updateSyncStatus(false);
             });
         }
@@ -287,16 +231,12 @@
             const dot = document.getElementById('syncDot');
             if (connected) {
                 el.textContent = "Conectado";
-                el.classList.remove('text-red-400');
-                el.classList.add('text-green-400');
-                dot.classList.remove('bg-red-500', 'animate-none');
-                dot.classList.add('bg-green-400', 'animate-pulse');
+                el.classList.remove('text-red-400'); el.classList.add('text-green-400');
+                dot.classList.remove('bg-red-500'); dot.classList.add('bg-green-400', 'animate-pulse');
             } else {
                 el.textContent = "Desconectado";
-                el.classList.add('text-red-400');
-                el.classList.remove('text-green-400');
-                dot.classList.add('bg-red-500');
-                dot.classList.remove('bg-green-400', 'animate-pulse');
+                el.classList.add('text-red-400'); el.classList.remove('text-green-400');
+                dot.classList.add('bg-red-500'); dot.classList.remove('bg-green-400', 'animate-pulse');
             }
         }
 
@@ -307,16 +247,12 @@
             updateActionButtons();
         }
 
-        // --- Estadísticas ---
+        // --- Estadísticas (Lógica Corregida) ---
         function updateStats() {
-            // *** CORRECCIÓN CRÍTICA: USAR TODA LA BASE DE DATOS PARA LAS ESTADÍSTICAS ***
-            // Antes: const activeLeads = allLeads.filter(l => !l.archivado);
-            // Ahora: Usamos allLeads para que el historial NO se borre al archivar.
-            
-            const sourceData = allLeads; // Usamos TODOS (Histórico completo)
+            const sourceData = allLeads; 
             const total = sourceData.length;
             
-            // Lógica de conteo
+            // Solo contamos si el campo tiene valor explícito
             const whatsapp = sourceData.filter(l => l.preferencia_contacto && l.preferencia_contacto.toLowerCase() === 'whatsapp').length;
             const telefono = sourceData.filter(l => l.preferencia_contacto && l.preferencia_contacto.toLowerCase() === 'telefono').length;
             
@@ -342,7 +278,29 @@
             window.requestAnimationFrame(step);
         }
 
-        // --- Guardado Seguro y Rápido ---
+        // --- Normalización Inteligente de Carreras (Fix Columna TEC) ---
+        function normalizeTecnicatura(rawTec) {
+            if (!rawTec) return '';
+            const lower = rawTec.toLowerCase().trim();
+            
+            // 1. Busqueda Exacta (Case Insensitive) en el Mapa
+            const exactMatch = Object.keys(tecnicaturaMap).find(key => key.toLowerCase() === lower);
+            if (exactMatch) return exactMatch;
+
+            // 2. Busqueda por Palabras Clave (Fuzzy)
+            if (lower.includes('web') || lower.includes('program') || lower.includes('stack') || lower.includes('full')) return 'Desarrollo web';
+            if (lower.includes('adm') || lower.includes('empresa') || lower.includes('negocio') || lower.includes('pyme') || lower.includes('contab')) return 'Administración de empresas';
+            if (lower.includes('mkt') || lower.includes('market') || lower.includes('venta') || lower.includes('comercial')) return 'Marketing';
+            if (lower.includes('hig') || lower.includes('segurid') || lower.includes('hys') || lower.includes('prevenc')) return 'Higiene y seguridad';
+            if (lower.includes('inmobi') || lower.includes('martillero') || lower.includes('propied') || lower.includes('corredor')) return 'Gestión inmobiliaria';
+            if (lower.includes('sist') || lower.includes('compu') || lower.includes('info') || lower.includes('tecnic')) return 'Analista de sistemas';
+            if (lower.includes('dato') || lower.includes('data') || lower.includes('ia') || lower.includes('analisis')) return 'Ciencia de datos e IA';
+            if (lower.includes('rrhh') || lower.includes('human') || lower.includes('person') || lower.includes('talento')) return 'Recursos humanos';
+            
+            return rawTec; // Fallback: Devuelve lo que encontró la IA si no machea
+        }
+
+        // --- Guardado Seguro ---
         async function processAndSaveLead(parsedData, showDuplicateMessage = false) {
             if (!parsedData) return false;
             
@@ -353,14 +311,20 @@
             }
 
             try {
-                const tecnicaturaNombre = parsedData.tecnicatura || '';
-                const tecnicaturaId = tecnicaturaMap[tecnicaturaNombre] || '';
+                // Paso 1: Normalizar el nombre de la carrera
+                let tecnicaturaNombre = normalizeTecnicatura(parsedData.tecnicatura);
+                // Paso 2: Obtener el ID
+                let tecnicaturaId = tecnicaturaMap[tecnicaturaNombre] || '';
+
                 const timestamp = Date.now();
                 const fechaFormateada = new Date(timestamp).toLocaleDateString('es-AR', {
                     day: '2-digit', month: '2-digit', year: 'numeric'
                 });
 
                 const observacionesAuto = buildObservaciones(parsedData);
+
+                // Forzamos null si no viene nada, para no contar en stats
+                const prefContacto = parsedData.preferencia_contacto || null;
 
                 const newLead = {
                     nombreCompleto: parsedData.nombre || 'Desconocido',
@@ -373,22 +337,21 @@
                     fechaCreacionTimestamp: timestamp,
                     ultimoContacto: '',
                     observaciones: observacionesAuto,
-                    preferencia_contacto: parsedData.preferencia_contacto || 'whatsapp', // Default si viene null para asegurar conteo
+                    preferencia_contacto: prefContacto,
                     archivado: false 
                 };
                 
                 if (!leadsCollectionRef) throw new Error("Base de datos no conectada.");
                 
-                // Guardar sin await bloqueante para UX, pero con catch para errores
                 addDoc(leadsCollectionRef, newLead).catch(err => {
-                    console.error("Error en background save:", err);
-                    showMessage("Error guardando en segundo plano.", true);
+                    console.error("Error save:", err);
+                    showMessage("Error guardando.", true);
                 });
                 
-                return true; // Retornar true inmediatamente para la UI
+                return true;
             } catch (err) {
-                console.error("Error al procesar:", err);
-                showMessage("Error al procesar: " + err.message, true);
+                console.error("Error process:", err);
+                showMessage("Error: " + err.message, true);
                 return false;
             }
         }
@@ -396,16 +359,13 @@
         function buildObservaciones(parsedData) {
             const prefix = "Ingresa por WhatsApp Comercial: ";
             let content = "Consulta general.";
-            
-            // Normalizar a minusculas para comparación segura
             const pref = (parsedData.preferencia_contacto || '').toLowerCase();
 
             if (pref === 'whatsapp') {
                 content = "Manifiesta que la contacten por WhatsApp.";
             } else if (pref === 'telefono') {
-                content = "Manifiesta que prefiere por esa vía."; // "Esa vía" = llamada
+                content = "Manifiesta que prefiere por esa vía.";
             }
-            
             return `${prefix}${content}`;
         }
 
@@ -413,94 +373,70 @@
             const newEmail = email ? email.trim() : '';
             const newPhone = phone ? phone.trim() : '';
             if (!newEmail && !newPhone) return null;
-            
             const activeLeads = allLeads.filter(l => !l.archivado);
-            if (newEmail && activeLeads.some(l => l.email === newEmail)) return `Ya existe un lead con email: ${newEmail}`;
-            if (newPhone && activeLeads.some(l => l.telefono === newPhone)) return `Ya existe un lead con teléfono: ${newPhone}`;
+            if (newEmail && activeLeads.some(l => l.email === newEmail)) return `Ya existe email: ${newEmail}`;
+            if (newPhone && activeLeads.some(l => l.telefono === newPhone)) return `Ya existe teléfono: ${newPhone}`;
             return null;
         }
 
-        // --- Manejadores de Interfaz ---
-
+        // --- Handlers UI ---
         window.handleProcesarClick = async () => {
             const input = document.getElementById('mensajeInput');
             const txt = input.value;
-            if (!txt.trim()) return showMessage("Por favor, ingresa un texto.", true);
-            
-            if(!leadsCollectionRef) {
-                return showMessage("Esperando conexión a base de datos...", true);
-            }
+            if (!txt.trim()) return showMessage("Ingresa texto.", true);
+            if(!leadsCollectionRef) return showMessage("Sin conexión DB.", true);
 
             showLoader(true);
             try {
                 const parsed = await parseWithGemini(txt);
-                const saved = await processAndSaveLead(parsed, true);
-                if (saved) {
+                if (await processAndSaveLead(parsed, true)) {
                     input.value = '';
-                    showMessage("¡Lead procesado! Guardando en segundo plano...", false);
+                    showMessage("Guardado correctamente.", false);
                 }
-            } catch (e) { 
-                showMessage(e.message, true); 
-            } finally { 
-                showLoader(false); 
-            }
+            } catch (e) { showMessage(e.message, true); } 
+            finally { showLoader(false); }
         };
 
-        // Descargar Excel (IDs en Tecnicatura)
         window.handleDescargar = () => {
             if (displayLeads.length === 0) return;
-            
             const data = displayLeads.map(l => ({
                 'ID': l.id.substring(0,5).toUpperCase(),
                 'Nombre Completo': l.nombreCompleto,
                 'Email': l.email,
                 'Teléfono': l.telefono,
-                'Tecnicatura': l.tecnicaturaId || '',
+                'Tecnicatura': l.tecnicaturaId || '', // ID numérico
                 'Estado': l.estado,
                 'Vendedor Asignado': l.vendedorAsignado,
                 'Fecha de Creación': l.fechaCreacion,
                 'Último Contacto': l.ultimoContacto,
                 'Observaciones': l.observaciones
             }));
-            
             const ws = XLSX.utils.json_to_sheet(data, { header: excelHeaders });
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Leads");
-            const filename = showArchived ? "Historial_Archivados.xlsx" : "Leads_Activos.xlsx";
-            XLSX.writeFile(wb, filename);
+            XLSX.writeFile(wb, showArchived ? "Historial.xlsx" : "Leads.xlsx");
         };
 
-        // --- Renderizado de Tabla ---
+        // --- Render ---
         function renderTable() {
             const tbody = document.getElementById('leadsTableBody');
             tbody.innerHTML = '';
-            
             if (displayLeads.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="11" class="text-center p-8 text-gray-500 italic">No hay datos para mostrar.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="11" class="text-center p-8 text-gray-500 italic">Sin datos.</td></tr>`;
                 return;
             }
-
             displayLeads.forEach(lead => {
                 const tr = document.createElement('tr');
                 tr.className = "table-row group";
                 
+                // Botones
                 let btns = '';
                 if (showArchived) {
-                    btns = `
-                        <button onclick="handleRestore('${lead.id}')" class="text-green-400 hover:text-green-300 p-1" title="Restaurar">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                        </button>
-                        <button onclick="handleDeleteClick('${lead.id}', '${lead.nombreCompleto}')" class="text-red-400 hover:text-red-300 p-1" title="Eliminar Definitivamente">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                        </button>`;
+                    btns = `<button onclick="handleRestore('${lead.id}')" class="text-green-400 hover:text-green-300 p-1" title="Restaurar"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></button>
+                            <button onclick="handleDeleteClick('${lead.id}', '${lead.nombreCompleto}')" class="text-red-400 hover:text-red-300 p-1" title="Borrar"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>`;
                 } else {
-                    btns = `
-                        <button onclick="handleEditClick('${lead.id}')" class="text-blue-400 hover:text-blue-300 p-1" title="Editar">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                        </button>
-                        <button onclick="handleDeleteClick('${lead.id}', '${lead.nombreCompleto}')" class="text-gray-500 hover:text-red-400 p-1" title="Archivar">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                        </button>`;
+                    btns = `<button onclick="handleEditClick('${lead.id}')" class="text-blue-400 hover:text-blue-300 p-1" title="Editar"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
+                            <button onclick="handleDeleteClick('${lead.id}', '${lead.nombreCompleto}')" class="text-gray-500 hover:text-red-400 p-1" title="Archivar"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>`;
                 }
 
                 let statusColor = 'bg-gray-700 text-gray-300';
@@ -508,19 +444,20 @@
                 if (lead.estado === 'matriculado') statusColor = 'bg-green-900 text-green-200';
                 if (lead.estado === 'interesado') statusColor = 'bg-yellow-900 text-yellow-200';
 
+                // Nombre de la carrera para mostrar en tabla (no ID)
+                const tecNombre = tecnicaturaNameMap[lead.tecnicaturaId] || lead.tecnicaturaId || '-';
+
                 tr.innerHTML = `
                     <td class="table-cell font-mono text-xs opacity-70">${lead.id.substring(0,4)}</td>
                     <td class="table-cell font-medium text-white">${lead.nombreCompleto}</td>
                     <td class="table-cell text-xs">${lead.email}</td>
                     <td class="table-cell text-xs">${lead.telefono}</td>
-                    <td class="table-cell text-xs text-sky-300">${tecnicaturaNameMap[lead.tecnicaturaId] || '-'}</td>
+                    <td class="table-cell text-xs text-sky-300">${tecNombre}</td>
                     <td class="table-cell"><span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wide ${statusColor}">${lead.estado}</span></td>
                     <td class="table-cell text-xs">${lead.vendedorAsignado}</td>
                     <td class="table-cell text-xs opacity-70">${lead.fechaCreacion}</td>
                     <td class="table-cell text-[10px] max-w-[150px] truncate" title="${lead.observaciones}">${lead.observaciones}</td>
-                    <td class="table-cell text-center flex justify-center gap-1 opacity-60 group-hover:opacity-100 transition">
-                        ${btns}
-                    </td>
+                    <td class="table-cell text-center flex justify-center gap-1 opacity-60 group-hover:opacity-100 transition">${btns}</td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -532,20 +469,18 @@
             document.getElementById('archivarTodoBtn').disabled = !hasData;
         }
 
-        // --- Utils y Listeners ---
+        // --- Helpers UI ---
         function showLoader(s) { document.getElementById('loader').classList.toggle('hidden', !s); }
         function showMessage(m, e) {
             const b = document.getElementById('messageBox');
             document.getElementById('messageText').textContent = m;
             b.className = `fixed bottom-4 right-4 z-50 px-6 py-4 rounded-lg shadow-2xl backdrop-blur-xl border flex items-center gap-3 transition-all duration-300 ${e ? 'bg-red-900/90 border-red-500 text-white' : 'bg-teal-900/90 border-teal-500 text-white'}`;
-            b.classList.remove('hidden');
-            setTimeout(() => b.classList.add('hidden'), 5000);
+            b.classList.remove('hidden'); setTimeout(() => b.classList.add('hidden'), 5000);
         }
 
-        // Helpers de Edición/Borrado
+        // --- Edit / Delete ---
         window.handleEditClick = (id) => {
-            const lead = allLeads.find(l => l.id === id);
-            if (!lead) return;
+            const lead = allLeads.find(l => l.id === id); if (!lead) return;
             leadIdToEdit = id;
             document.getElementById('editNombre').value = lead.nombreCompleto;
             document.getElementById('editEmail').value = lead.email;
@@ -558,24 +493,23 @@
         };
 
         window.saveEdit = async () => {
-            if (!leadIdToEdit) return;
-            showLoader(true);
+            if (!leadIdToEdit) return; showLoader(true);
             try {
                 const tecName = document.getElementById('editTecnicatura').value;
+                const tecId = tecnicaturaMap[tecName] || '';
                 const updatedData = {
                     nombreCompleto: document.getElementById('editNombre').value,
                     email: document.getElementById('editEmail').value,
                     telefono: document.getElementById('editTelefono').value,
-                    tecnicaturaId: tecnicaturaMap[tecName] || '',
+                    tecnicaturaId: tecId,
                     estado: document.getElementById('editEstado').value,
                     vendedorAsignado: document.getElementById('editVendedor').value,
                     observaciones: document.getElementById('editObservaciones').value
                 };
                 await updateDoc(doc(leadsCollectionRef, leadIdToEdit), updatedData);
                 document.getElementById('editModal').classList.add('hidden');
-                showMessage("Lead actualizado exitosamente.", false);
-            } catch (err) { showMessage(err.message, true); }
-            finally { showLoader(false); leadIdToEdit = null; }
+                showMessage("Actualizado.", false);
+            } catch (e) { showMessage(e.message, true); } finally { showLoader(false); leadIdToEdit = null; }
         };
 
         window.handleDeleteClick = (id, name) => {
@@ -583,98 +517,54 @@
             document.getElementById('deleteLeadName').textContent = name;
             const modalTitle = document.querySelector('#confirmDeleteOneModal h3');
             const modalBtn = document.querySelector('#confirmDeleteOneModal button.bg-red-600');
-            
-            if (showArchived) {
-                modalTitle.textContent = "Eliminar Definitivamente";
-                modalBtn.textContent = "Eliminar";
-            } else {
-                modalTitle.textContent = "Archivar Lead";
-                modalBtn.textContent = "Archivar";
-            }
+            if (showArchived) { modalTitle.textContent = "Eliminar Definitivamente"; modalBtn.textContent = "Eliminar"; }
+            else { modalTitle.textContent = "Archivar Lead"; modalBtn.textContent = "Archivar"; }
             document.getElementById('confirmDeleteOneModal').classList.remove('hidden');
         };
 
         window.confirmDeleteOne = async () => {
-            if (!leadIdToDelete) return;
-            showLoader(true);
+            if (!leadIdToDelete) return; showLoader(true);
             try {
                 const docRef = doc(leadsCollectionRef, leadIdToDelete);
-                if (showArchived) {
-                    await deleteDoc(docRef);
-                    showMessage("Eliminado definitivamente.", false);
-                } else {
-                    await updateDoc(docRef, { archivado: true });
-                    showMessage("Archivado correctamente.", false);
-                }
+                if (showArchived) { await deleteDoc(docRef); showMessage("Eliminado.", false); }
+                else { await updateDoc(docRef, { archivado: true }); showMessage("Archivado.", false); }
                 document.getElementById('confirmDeleteOneModal').classList.add('hidden');
-            } catch (err) { showMessage(err.message, true); }
-            finally { showLoader(false); leadIdToDelete = null; }
+            } catch (e) { showMessage(e.message, true); } finally { showLoader(false); leadIdToDelete = null; }
         };
 
         window.handleRestore = async (id) => {
             showLoader(true);
-            try {
-                await updateDoc(doc(leadsCollectionRef, id), { archivado: false });
-                showMessage("Lead restaurado.", false);
-            } catch (e) { showMessage(e.message, true); }
-            finally { showLoader(false); }
+            try { await updateDoc(doc(leadsCollectionRef, id), { archivado: false }); showMessage("Restaurado.", false); }
+            catch (e) { showMessage(e.message, true); } finally { showLoader(false); }
         };
 
         window.toggleArchivedView = () => {
             showArchived = !showArchived;
             const btn = document.getElementById('toggleArchivedBtn');
             const title = document.getElementById('tableTitle');
-            // Botón de Archivar Todo
             const archBtn = document.getElementById('archivarTodoBtn');
-
-            if (showArchived) {
-                btn.textContent = "Ver Activos";
-                btn.classList.add('bg-blue-600', 'text-white');
-                btn.classList.remove('bg-gray-700', 'text-gray-300');
-                title.textContent = "Historial (Archivados)";
-                title.classList.add('text-orange-400');
-                archBtn.classList.add('hidden'); // Ocultar al ver historial
-            } else {
-                btn.textContent = "Ver Historial";
-                btn.classList.remove('bg-blue-600', 'text-white');
-                btn.classList.add('bg-gray-700', 'text-gray-300');
-                title.textContent = "Base de Datos";
-                title.classList.remove('text-orange-400');
-                archBtn.classList.remove('hidden'); // Mostrar en activos
-            }
+            if (showArchived) { btn.textContent = "Ver Activos"; btn.classList.add('bg-blue-600', 'text-white'); btn.classList.remove('bg-gray-700', 'text-gray-300'); title.textContent = "Historial (Archivados)"; title.classList.add('text-orange-400'); archBtn.classList.add('hidden'); }
+            else { btn.textContent = "Ver Historial"; btn.classList.remove('bg-blue-600', 'text-white'); btn.classList.add('bg-gray-700', 'text-gray-300'); title.textContent = "Base de Datos"; title.classList.remove('text-orange-400'); archBtn.classList.remove('hidden'); }
             filterAndRender();
         };
 
         window.confirmArchiveAll = async () => {
              document.getElementById('confirmModal').classList.add('hidden');
              const toArchive = allLeads.filter(l => !l.archivado);
-             if (toArchive.length === 0) return;
-             showLoader(true);
+             if (toArchive.length === 0) return; showLoader(true);
              try {
                  const batch = writeBatch(db);
                  toArchive.forEach(l => batch.update(doc(leadsCollectionRef, l.id), { archivado: true }));
-                 await batch.commit();
-                 showMessage("Todos los leads archivados.", false);
-             } catch(e) { showMessage(e.message, true); }
-             finally { showLoader(false); }
+                 await batch.commit(); showMessage("Archivados.", false);
+             } catch(e) { showMessage(e.message, true); } finally { showLoader(false); }
         };
 
-        // --- IA Parser ---
         async function parseWithGemini(text, isImage, mimeType) {
             const usedKey = ORIGINAL_API_KEY;
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${usedKey}`;
-            const parts = isImage 
-                ? [{ text: "Extrae datos JSON." }, { inlineData: { mimeType, data: text } }]
-                : [{ text }];
-            
-            const payload = {
-                contents: [{ parts }],
-                systemInstruction: { parts: [{ text: systemPromptForGemini }] },
-                generationConfig: { responseMimeType: "application/json", responseSchema: jsonSchemaForGemini }
-            };
-
+            const parts = isImage ? [{ text: "Extrae JSON." }, { inlineData: { mimeType, data: text } }] : [{ text }];
+            const payload = { contents: [{ parts }], systemInstruction: { parts: [{ text: systemPromptForGemini }] }, generationConfig: { responseMimeType: "application/json", responseSchema: jsonSchemaForGemini } };
             const res = await fetch(url, { method: 'POST', body: JSON.stringify(payload), headers: {'Content-Type': 'application/json'} });
-            if (!res.ok) throw new Error("Error en IA: " + res.statusText);
             const json = await res.json();
             return JSON.parse(json.candidates[0].content.parts[0].text);
         }
@@ -682,16 +572,11 @@
         // Init
         document.addEventListener('DOMContentLoaded', () => {
             setupFirebase();
-            
-            const imgInput = document.getElementById('imagenInput');
-            const xlsInput = document.getElementById('excelInput');
-            
+            const imgInput = document.getElementById('imagenInput'); const xlsInput = document.getElementById('excelInput');
             document.getElementById('procesarImagenBtn').onclick = () => imgInput.click();
             document.getElementById('procesarExcelBtn').onclick = () => xlsInput.click();
-            
             imgInput.onchange = (e) => handleFile(e.target.files[0], 'image');
             xlsInput.onchange = (e) => handleFile(e.target.files[0], 'excel');
-            
             document.getElementById('mensajeInput').addEventListener('paste', (e) => {
                 const item = Array.from(e.clipboardData.items).find(i => i.type.startsWith('image/'));
                 if (item) handleFile(item.getAsFile(), 'image');
@@ -699,225 +584,101 @@
         });
 
         async function handleFile(file, type) {
-            if(!file) return;
-            showLoader(true);
+            if(!file) return; showLoader(true);
             try {
                 const reader = new FileReader();
                 reader.onload = async (e) => {
                     if (type === 'image') {
                         const parsed = await parseWithGemini(e.target.result.split(',')[1], true, file.type);
-                        await processAndSaveLead(parsed, true);
-                        showMessage("Imagen procesada.", false);
+                        await processAndSaveLead(parsed, true); showMessage("Imagen OK.", false);
                     } else {
                         const wb = XLSX.read(e.target.result, {type:'array'});
                         const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-                        let c = 0;
-                        for(let r of rows) {
-                            const txt = Object.values(r).join(' ');
-                            if(await processAndSaveLead(await parseWithGemini(txt), false)) c++;
-                        }
-                        showMessage(`Excel: ${c} importados.`, false);
+                        let c = 0; for(let r of rows) { const txt = Object.values(r).join(' '); if(await processAndSaveLead(await parseWithGemini(txt), false)) c++; }
+                        showMessage(`Excel: ${c} OK.`, false);
                     }
                     showLoader(false);
                 };
                 type === 'image' ? reader.readAsDataURL(file) : reader.readAsArrayBuffer(file);
-            } catch(e) { showLoader(false); showMessage("Error en archivo.", true); }
+            } catch(e) { showLoader(false); showMessage("Error archivo.", true); }
         }
     </script>
 </head>
 <body class="p-4 md:p-6 overflow-hidden">
 
-    <!-- Container Principal (Dashboard Layout) -->
+    <!-- Dashboard Layout -->
     <div class="max-w-[1600px] mx-auto h-[95vh] flex flex-col gap-6">
-
-        <!-- 1. Encabezado Estilo Tarjeta -->
         <header class="glass-panel p-6 flex justify-between items-center shrink-0">
-            <div>
-                <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-sky-400 to-teal-400">
-                    Convertidor de WhatsApp a Leads
-                </h1>
-                <p class="text-sm text-slate-400 mt-1">Dpto. Comercial • v6.9 Final Stable</p>
-            </div>
-            <!-- Indicador de Sincronización -->
-            <div class="flex items-center gap-2 bg-slate-900/50 px-4 py-2 rounded-full border border-slate-700/50">
-                <div id="syncDot" class="w-2.5 h-2.5 rounded-full bg-red-500"></div>
-                <span id="syncStatus" class="text-xs font-mono text-red-400 tracking-wider uppercase">Desconectado</span>
-            </div>
+            <div><h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-sky-400 to-teal-400">Convertidor de WhatsApp a Leads</h1><p class="text-sm text-slate-400 mt-1">Dpto. Comercial • v7.2 Precision Fix</p></div>
+            <div class="flex items-center gap-2 bg-slate-900/50 px-4 py-2 rounded-full border border-slate-700/50"><div id="syncDot" class="w-2.5 h-2.5 rounded-full bg-red-500"></div><span id="syncStatus" class="text-xs font-mono text-red-400 tracking-wider uppercase">Desconectado</span></div>
         </header>
 
-        <!-- 2. Tarjetas de Estadísticas -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 shrink-0">
-            <div class="stat-card p-5 flex flex-col items-center justify-center text-center group">
-                <span class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Procesados (Histórico)</span>
-                <span id="statTotal" class="text-4xl font-bold text-white group-hover:scale-110 transition-transform">0</span>
-            </div>
-            <div class="stat-card p-5 flex flex-col items-center justify-center text-center group">
-                <span class="text-xs font-bold text-green-400/80 uppercase tracking-widest mb-1">WhatsApp</span>
-                <span id="statWhatsapp" class="text-4xl font-bold text-green-400 group-hover:scale-110 transition-transform">0%</span>
-            </div>
-            <div class="stat-card p-5 flex flex-col items-center justify-center text-center group">
-                <span class="text-xs font-bold text-sky-400/80 uppercase tracking-widest mb-1">Llamados</span>
-                <span id="statPhone" class="text-4xl font-bold text-sky-400 group-hover:scale-110 transition-transform">0%</span>
-            </div>
+            <div class="stat-card p-5 flex flex-col items-center justify-center text-center group"><span class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Procesados (Histórico)</span><span id="statTotal" class="text-4xl font-bold text-white group-hover:scale-110 transition-transform">0</span></div>
+            <div class="stat-card p-5 flex flex-col items-center justify-center text-center group"><span class="text-xs font-bold text-green-400/80 uppercase tracking-widest mb-1">WhatsApp</span><span id="statWhatsapp" class="text-4xl font-bold text-green-400 group-hover:scale-110 transition-transform">0%</span></div>
+            <div class="stat-card p-5 flex flex-col items-center justify-center text-center group"><span class="text-xs font-bold text-sky-400/80 uppercase tracking-widest mb-1">Llamados</span><span id="statPhone" class="text-4xl font-bold text-sky-400 group-hover:scale-110 transition-transform">0%</span></div>
         </div>
 
-        <!-- 3. Contenido Principal (Split View) -->
         <div class="flex flex-col lg:flex-row gap-6 flex-grow min-h-0">
-            
-            <!-- Panel Izquierdo: Ingreso (Fijo ancho) -->
             <div class="lg:w-1/3 glass-panel p-6 flex flex-col gap-4 shrink-0">
                 <h2 class="text-lg font-semibold text-white mb-2">Ingreso Inteligente</h2>
-                
-                <textarea id="mensajeInput" class="dashboard-input w-full flex-grow rounded-xl p-4 resize-none text-sm font-mono leading-relaxed" 
-                    placeholder="Pega aquí el texto de WhatsApp, un email o una captura de pantalla (Ctrl+V)..."></textarea>
-                
-                <button onclick="handleProcesarClick()" class="btn-primary w-full py-3 rounded-xl font-bold text-white shadow-lg flex items-center justify-center gap-2">
-                    <svg class="w-5 h-5 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                    Procesar con IA
-                </button>
-
-                <div class="grid grid-cols-2 gap-3 mt-2">
-                    <button id="procesarExcelBtn" class="dashboard-input py-3 rounded-lg text-xs font-bold text-teal-300 hover:bg-teal-900/30 flex items-center justify-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                        Importar Excel
-                    </button>
-                    <button id="procesarImagenBtn" class="dashboard-input py-3 rounded-lg text-xs font-bold text-indigo-300 hover:bg-indigo-900/30 flex items-center justify-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                        Subir Imagen
-                    </button>
-                </div>
-                <!-- Inputs ocultos -->
-                <input type="file" id="excelInput" class="hidden" accept=".xlsx,.xls">
-                <input type="file" id="imagenInput" class="hidden" accept="image/*">
+                <textarea id="mensajeInput" class="dashboard-input w-full flex-grow rounded-xl p-4 resize-none text-sm font-mono leading-relaxed" placeholder="Pega aquí el texto de WhatsApp..."></textarea>
+                <button onclick="handleProcesarClick()" class="btn-primary w-full py-3 rounded-xl font-bold text-white shadow-lg flex items-center justify-center gap-2"><svg class="w-5 h-5 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>Procesar con IA</button>
+                <div class="grid grid-cols-2 gap-3 mt-2"><button id="procesarExcelBtn" class="dashboard-input py-3 rounded-lg text-xs font-bold text-teal-300 hover:bg-teal-900/30 flex items-center justify-center gap-2">Importar Excel</button><button id="procesarImagenBtn" class="dashboard-input py-3 rounded-lg text-xs font-bold text-indigo-300 hover:bg-indigo-900/30 flex items-center justify-center gap-2">Subir Imagen</button></div>
+                <input type="file" id="excelInput" class="hidden" accept=".xlsx,.xls"><input type="file" id="imagenInput" class="hidden" accept="image/*">
             </div>
 
-            <!-- Panel Derecho: Tabla (Flexible) -->
             <div class="lg:w-2/3 glass-panel flex flex-col overflow-hidden">
-                <!-- Header Tabla -->
                 <div class="p-4 border-b border-white/5 flex justify-between items-center bg-slate-900/30">
-                    <div>
-                        <h2 id="tableTitle" class="text-lg font-semibold text-white">Base de Datos</h2>
-                    </div>
+                    <div><h2 id="tableTitle" class="text-lg font-semibold text-white">Base de Datos</h2></div>
                     <div class="flex gap-3">
-                        <button id="archivarTodoBtn" onclick="document.getElementById('confirmModal').classList.remove('hidden')" class="bg-orange-600 hover:bg-orange-500 text-white px-3 py-1.5 rounded text-xs font-bold shadow-lg flex items-center gap-1">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg>
-                            Archivar Todo
-                        </button>
-                        <button id="toggleArchivedBtn" onclick="toggleArchivedView()" class="dashboard-input px-3 py-1.5 rounded text-xs font-medium hover:bg-white/10">
-                            Ver Historial
-                        </button>
-                        <button id="descargarBtn" onclick="handleDescargar()" disabled class="bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded text-xs font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                            Excel
-                        </button>
+                        <button id="archivarTodoBtn" onclick="document.getElementById('confirmModal').classList.remove('hidden')" class="bg-orange-600 hover:bg-orange-500 text-white px-3 py-1.5 rounded text-xs font-bold shadow-lg flex items-center gap-1">Archivar Todo</button>
+                        <button id="toggleArchivedBtn" onclick="toggleArchivedView()" class="dashboard-input px-3 py-1.5 rounded text-xs font-medium hover:bg-white/10">Ver Historial</button>
+                        <button id="descargarBtn" onclick="handleDescargar()" disabled class="bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded text-xs font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1">Excel</button>
                     </div>
                 </div>
-
-                <!-- Tabla Scrolleable -->
                 <div class="overflow-auto flex-grow bg-slate-900/20">
-                    <table class="w-full text-left border-collapse">
-                        <thead class="sticky top-0 z-10">
-                            <tr class="table-header">
-                                <th class="p-3">ID</th>
-                                <th class="p-3">Nombre</th>
-                                <th class="p-3">Email</th>
-                                <th class="p-3">Tel</th>
-                                <th class="p-3">Tec</th>
-                                <th class="p-3">Estado</th>
-                                <th class="p-3">Vend</th>
-                                <th class="p-3">Fecha</th>
-                                <th class="p-3">Obs</th>
-                                <th class="p-3 text-center">Acción</th>
-                            </tr>
-                        </thead>
-                        <tbody id="leadsTableBody">
-                            <!-- JS Injection -->
-                        </tbody>
-                    </table>
+                    <table class="w-full text-left border-collapse"><thead class="sticky top-0 z-10"><tr class="table-header"><th class="p-3">ID</th><th class="p-3">Nombre</th><th class="p-3">Email</th><th class="p-3">Tel</th><th class="p-3">Tec</th><th class="p-3">Estado</th><th class="p-3">Vend</th><th class="p-3">Fecha</th><th class="p-3">Obs</th><th class="p-3 text-center">Acción</th></tr></thead><tbody id="leadsTableBody"></tbody></table>
                 </div>
-                
-                <!-- Footer Tabla -->
-                <div class="p-2 bg-slate-900/40 border-t border-white/5 text-[10px] text-center text-slate-500 font-mono">
-                    Conectado a Firestore (Mode: Core Stable) • ID de Sesión: <script>document.write(typeof __app_id !== 'undefined' ? __app_id.substring(0,8) : 'DEV-MODE')</script>
-                </div>
+                <div class="p-2 bg-slate-900/40 border-t border-white/5 text-[10px] text-center text-slate-500 font-mono">Conectado a Firestore (Stable Mode)</div>
             </div>
         </div>
     </div>
 
-    <!-- Loader Overlay -->
-    <div id="loader" class="hidden fixed inset-0 z-[60] bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center">
-        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-sky-500 mb-4"></div>
-        <p class="text-white font-mono animate-pulse">Procesando con IA...</p>
-    </div>
+    <!-- Components (Loader, Modals, etc) -->
+    <div id="loader" class="hidden fixed inset-0 z-[60] bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center"><div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-sky-500 mb-4"></div><p class="text-white font-mono animate-pulse">Procesando...</p></div>
+    <div id="messageBox" class="hidden"><span id="messageText" class="font-medium text-sm"></span></div>
 
-    <!-- Notification Toast -->
-    <div id="messageBox" class="hidden">
-        <span id="messageText" class="font-medium text-sm"></span>
-    </div>
-
-    <!-- Modales (Edit / Confirm) -->
-    
     <!-- Edit Modal -->
     <div id="editModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
         <div class="bg-slate-800 rounded-2xl shadow-2xl border border-white/10 w-full max-w-lg p-6">
             <h3 class="text-xl font-bold text-white mb-6">Editar Lead</h3>
             <div class="space-y-4">
                 <input type="text" id="editNombre" class="dashboard-input w-full p-3 rounded-lg" placeholder="Nombre">
-                <div class="grid grid-cols-2 gap-4">
-                    <input type="email" id="editEmail" class="dashboard-input w-full p-3 rounded-lg" placeholder="Email">
-                    <input type="text" id="editTelefono" class="dashboard-input w-full p-3 rounded-lg" placeholder="Teléfono">
-                </div>
-                <select id="editTecnicatura" class="dashboard-input w-full p-3 rounded-lg bg-slate-800">
-                    <option value="">-- Tecnicatura --</option>
-                    <option value="Desarrollo web">Desarrollo web</option>
-                    <option value="Administración de empresas">Administración de empresas</option>
-                    <option value="Marketing">Marketing</option>
-                    <option value="Higiene y seguridad">Higiene y seguridad</option>
-                    <option value="Gestión inmobiliaria">Gestión inmobiliaria</option>
-                    <option value="Analista de sistemas">Analista de sistemas</option>
-                    <option value="Ciencia de datos e IA">Ciencia de datos e IA</option>
-                    <option value="Recursos humanos">Recursos humanos</option>
-                </select>
-                <div class="grid grid-cols-2 gap-4">
-                    <select id="editEstado" class="dashboard-input w-full p-3 rounded-lg bg-slate-800">
-                        <option value="sin_contacto">Sin Contacto</option>
-                        <option value="contactado">Contactado</option>
-                        <option value="interesado">Interesado</option>
-                        <option value="matriculado">Matriculado</option>
-                        <option value="descartado">Descartado</option>
-                    </select>
-                    <input type="text" id="editVendedor" class="dashboard-input w-full p-3 rounded-lg" placeholder="Vendedor">
-                </div>
+                <div class="grid grid-cols-2 gap-4"><input type="email" id="editEmail" class="dashboard-input w-full p-3 rounded-lg" placeholder="Email"><input type="text" id="editTelefono" class="dashboard-input w-full p-3 rounded-lg" placeholder="Teléfono"></div>
+                <select id="editTecnicatura" class="dashboard-input w-full p-3 rounded-lg bg-slate-800"><option value="">-- Tecnicatura --</option><option value="Desarrollo web">Desarrollo web</option><option value="Administración de empresas">Administración de empresas</option><option value="Marketing">Marketing</option><option value="Higiene y seguridad">Higiene y seguridad</option><option value="Gestión inmobiliaria">Gestión inmobiliaria</option><option value="Analista de sistemas">Analista de sistemas</option><option value="Ciencia de datos e IA">Ciencia de datos e IA</option><option value="Recursos humanos">Recursos humanos</option></select>
+                <div class="grid grid-cols-2 gap-4"><select id="editEstado" class="dashboard-input w-full p-3 rounded-lg bg-slate-800"><option value="sin_contacto">Sin Contacto</option><option value="contactado">Contactado</option><option value="interesado">Interesado</option><option value="matriculado">Matriculado</option><option value="descartado">Descartado</option></select><input type="text" id="editVendedor" class="dashboard-input w-full p-3 rounded-lg" placeholder="Vendedor"></div>
                 <textarea id="editObservaciones" rows="3" class="dashboard-input w-full p-3 rounded-lg" placeholder="Observaciones"></textarea>
             </div>
-            <div class="mt-6 flex justify-end gap-3">
-                <button onclick="document.getElementById('editModal').classList.add('hidden')" class="px-4 py-2 rounded-lg bg-slate-700 text-white hover:bg-slate-600">Cancelar</button>
-                <button onclick="saveEdit()" class="px-4 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-500 shadow-lg">Guardar</button>
-            </div>
+            <div class="mt-6 flex justify-end gap-3"><button onclick="document.getElementById('editModal').classList.add('hidden')" class="px-4 py-2 rounded-lg bg-slate-700 text-white">Cancelar</button><button onclick="saveEdit()" class="px-4 py-2 rounded-lg bg-sky-600 text-white">Guardar</button></div>
         </div>
     </div>
 
-    <!-- Confirm Archive All -->
+    <!-- Confirm Archive -->
     <div id="confirmModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
         <div class="bg-slate-800 rounded-xl shadow-2xl border border-orange-500/30 p-6 max-w-sm mx-4 text-center">
             <h3 class="text-lg font-bold text-orange-400">📦 Archivar Todo</h3>
-            <p class="text-sm text-slate-400 mt-2">Los leads activos se moverán al <strong>Historial</strong>. Esto limpiará la vista principal.</p>
-            <div class="mt-6 flex justify-center gap-3">
-                <button onclick="document.getElementById('confirmModal').classList.add('hidden')" class="px-4 py-2 bg-slate-700 text-white rounded-lg">Cancelar</button>
-                <button onclick="confirmArchiveAll()" class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-500">Sí, Archivar</button>
-            </div>
+            <p class="text-sm text-slate-400 mt-2">Los leads activos se moverán al historial.</p>
+            <div class="mt-6 flex justify-center gap-3"><button onclick="document.getElementById('confirmModal').classList.add('hidden')" class="px-4 py-2 bg-slate-700 text-white rounded-lg">Cancelar</button><button onclick="confirmArchiveAll()" class="px-4 py-2 bg-orange-600 text-white rounded-lg">Sí, Archivar</button></div>
         </div>
     </div>
 
-    <!-- Confirm Delete One -->
+    <!-- Confirm Delete -->
     <div id="confirmDeleteOneModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
         <div class="bg-slate-800 rounded-xl shadow-2xl p-6 max-w-sm mx-4 text-center border border-white/10">
-            <h3 class="text-lg font-bold text-white">¿Confirmar Acción?</h3>
+            <h3 class="text-lg font-bold text-white">¿Confirmar?</h3>
             <p class="text-sm text-slate-400 mt-2">Lead: <strong id="deleteLeadName" class="text-sky-300"></strong></p>
-            <div class="mt-6 flex justify-center gap-3">
-                <button onclick="document.getElementById('confirmDeleteOneModal').classList.add('hidden')" class="px-4 py-2 bg-slate-700 text-white rounded-lg">Cancelar</button>
-                <button onclick="confirmDeleteOne()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-500 shadow-lg">Confirmar</button>
-            </div>
+            <div class="mt-6 flex justify-center gap-3"><button onclick="document.getElementById('confirmDeleteOneModal').classList.add('hidden')" class="px-4 py-2 bg-slate-700 text-white rounded-lg">Cancelar</button><button onclick="confirmDeleteOne()" class="px-4 py-2 bg-red-600 text-white rounded-lg">Confirmar</button></div>
         </div>
     </div>
 
