@@ -161,21 +161,49 @@
             'Estado', 'Vendedor Asignado', 'Fecha de Creación', 'Último Contacto', 'Observaciones'
         ];
         
-        // Prompt SUPER OPTIMIZADO y AGRESIVO para detección
+        // Prompt RECARGADO con inteligencia de sinónimos y abreviaturas
         const systemPromptForGemini = `
-            Eres un motor de extracción de datos. Tu prioridad es la VELOCIDAD y la PRECISIÓN en la preferencia de contacto.
+            Eres un motor de extracción de datos experto en interpretar lenguaje natural informal y abreviaturas académicas.
             
-            Salida JSON estrictamente:
+            Tu objetivo es normalizar la entrada a un JSON estricto:
             { "nombre": string, "email": string, "telefono": string, "tecnicatura": string, "preferencia_contacto": "whatsapp" | "telefono" | "whatsapp" }
 
-            REGLAS CRÍTICAS DE PREFERENCIA:
-            1. Si el usuario dice: "llámame", "llamada", "celular", "voz", "teléfono", "llamado" -> preferencia_contacto: "telefono".
-            2. Si el usuario dice: "escribime", "mensaje", "texto", "info por acá", "wpp", "whatsapp" -> preferencia_contacto: "whatsapp".
-            3. Si es una captura de chat y NO pide explícitamente llamada -> preferencia_contacto: "whatsapp" (asumir por defecto).
+            *** LÓGICA DE MAPEO DE CARRERAS (SUPER INTELIGENTE) ***
+            Debes detectar el interés y mapearlo EXACTAMENTE a uno de estos nombres normalizados, entendiendo sus variantes:
+
+            1. 'Desarrollo web' 
+               <- Detectar si menciona: "programacion", "web", "full stack", "dw", "desarrollo", "frontend", "backend", "dev", "codigo", "sitios web".
             
-            OTRAS REGLAS:
-            - Nombre: Unifica Nombre y Apellido.
-            - Tecnicatura: Mapea a 'Desarrollo web', 'Administración de empresas', 'Marketing', 'Higiene y seguridad', 'Gestión inmobiliaria', 'Analista de sistemas', 'Ciencia de datos e IA', 'Recursos humanos'.
+            2. 'Administración de empresas' 
+               <- Detectar si menciona: "adm", "admon", "administracion", "ae", "empresas", "admin", "gestión de empresas", "business", "ade", "adm de empresas".
+            
+            3. 'Marketing' 
+               <- Detectar si menciona: "mkt", "mercadotecnia", "marketing digital", "comercialización", "ventas", "mark", "mk".
+            
+            4. 'Higiene y seguridad' 
+               <- Detectar si menciona: "hys", "h&s", "seguridad", "higiene", "seguridad e higiene", "syh", "prevencion", "sh", "seg e hig".
+            
+            5. 'Gestión inmobiliaria' 
+               <- Detectar si menciona: "inmobiliaria", "corredor", "martillero", "bienes raices", "propiedades", "tasador", "gestion inm", "inmuebles".
+            
+            6. 'Analista de sistemas' 
+               <- Detectar si menciona: "sistemas", "analista", "computacion", "informatica", "ads", "software", "tecnico en sistemas", "asi".
+            
+            7. 'Ciencia de datos e IA' 
+               <- Detectar si menciona: "datos", "data", "ia", "inteligencia artificial", "ciencia de datos", "data science", "analisis de datos", "big data".
+            
+            8. 'Recursos humanos' 
+               <- Detectar si menciona: "rrhh", "rh", "personal", "talento", "human resources", "capital humano", "recursos".
+
+            Si no encuentras ninguna carrera clara, devuelve cadena vacía "".
+
+            *** PREFERENCIAS ***
+            - 'telefono': "llámame", "llamada", "celular", "voz", "teléfono", "llamado".
+            - 'whatsapp': "escribime", "mensaje", "texto", "info por acá", "wpp", "whatsapp", o es captura de chat.
+            
+            *** DATOS PERSONALES ***
+            - Nombre: Unifica si vienen separados.
+            - Email: Busca patrones de correo agresivamente.
         `;
 
         const jsonSchemaForGemini = {
