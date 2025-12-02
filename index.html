@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Procesador de Leads v8.3 - Parsing Fix & Edit</title>
+    <title>Procesador de Leads v8.4 - Fix Observaciones</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- SheetJS -->
@@ -274,10 +274,9 @@
                 // Por defecto, si viene de un chat sucio y no dice nada, asumimos WPP para que cuente
                 const pref = parsed.preferencia || 'whatsapp'; 
                 
-                let obsText = "Consulta general.";
-                if (pref === 'whatsapp') obsText = "Manifiesta que la contacten por WhatsApp.";
-                if (pref === 'telefono') obsText = "Manifiesta que prefiere por esa vía (Llamada).";
-                obsText += " Consulta por WhatsApp";
+                let obsText = "Ingresa por WhatsApp Comercial - Consulta general.";
+                if (pref === 'whatsapp') obsText = "Ingresa por WhatsApp Comercial - Manifiesta que la contacten por WhatsApp.";
+                if (pref === 'telefono') obsText = "Ingresa por WhatsApp Comercial - Manifiesta que prefiere por esa vía (Llamada).";
 
                 const newDoc = {
                     nombre: parsed.nombre || 'Desconocido',
@@ -451,10 +450,9 @@
                             const tecId = tecnicaturaMap[tecName] || '';
                             const pref = parsed.preferencia || 'whatsapp';
                             
-                            let obsText = "Consulta general.";
-                            if (pref === 'whatsapp') obsText = "Manifiesta que la contacten por WhatsApp.";
-                            if (pref === 'telefono') obsText = "Manifiesta que prefiere por esa vía (Llamada).";
-                            obsText += " Consulta por WhatsApp";
+                            let obsText = "Ingresa por WhatsApp Comercial - Consulta general.";
+                            if (pref === 'whatsapp') obsText = "Ingresa por WhatsApp Comercial - Manifiesta que la contacten por WhatsApp.";
+                            if (pref === 'telefono') obsText = "Ingresa por WhatsApp Comercial - Manifiesta que prefiere por esa vía (Llamada).";
 
                             const newDoc = {
                                 nombre: parsed.nombre || 'Desconocido',
@@ -550,7 +548,7 @@
                 <h1 class="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-300 to-blue-400">
                     Procesador de Leads
                 </h1>
-                <p class="text-blue-200 opacity-80 mt-1">Versión 8.3 • Clean Parse & Edit</p>
+                <p class="text-blue-200 opacity-80 mt-1">Versión 8.4 • Fix Observaciones</p>
             </div>
         </header>
 
