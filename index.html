@@ -3,110 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Procesador de Leads v7.2 - Precision Fix</title>
-    <!-- Carga de Tailwind CSS -->
+    <title>Procesador de Leads v8.1 - Historical Offset</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Carga de SheetJS -->
+    <!-- SheetJS -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    
-    <!-- Fuente Google Fonts (Inter & Roboto Mono) -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Fuentes -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background: radial-gradient(circle at top left, #0f172a, #0e7490, #064e3b);
-            background-size: cover;
+            background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #06b6d4 100%);
+            background-attachment: fixed;
+            color: #f1f5f9;
             min-height: 100vh;
-            color: #e2e8f0;
         }
 
-        /* Scrollbar */
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.1); }
-        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.4); }
-
-        /* Glassmorphism */
         .glass-panel {
             background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
-            border-radius: 1rem;
+            border-radius: 16px;
         }
 
-        .stat-card {
-            background: rgba(15, 23, 42, 0.6);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: 0.75rem;
-            transition: transform 0.2s, background 0.2s;
-        }
-        .stat-card:hover {
-            transform: translateY(-2px);
-            background: rgba(15, 23, 42, 0.8);
-            border-color: rgba(255, 255, 255, 0.2);
-        }
-
-        .dashboard-input {
-            background: rgba(0, 0, 0, 0.3);
+        .glass-input {
+            background: rgba(0, 0, 0, 0.2);
             border: 1px solid rgba(255, 255, 255, 0.1);
             color: white;
-            transition: all 0.2s;
+            transition: all 0.3s ease;
         }
-        .dashboard-input:focus {
-            background: rgba(0, 0, 0, 0.5);
-            border-color: #38bdf8;
+        .glass-input:focus {
+            background: rgba(0, 0, 0, 0.4);
+            border-color: #22d3ee;
             outline: none;
-            box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+            box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.3);
         }
-        .dashboard-input::placeholder { color: rgba(255, 255, 255, 0.4); }
+        .glass-input::placeholder { color: rgba(255, 255, 255, 0.5); }
 
-        .btn-primary {
-            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
-            border: 1px solid rgba(255,255,255,0.1);
+        .btn-action {
+            background: linear-gradient(90deg, #0891b2 0%, #2563eb 100%);
+            border: 1px solid rgba(255,255,255,0.2);
             color: white;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.2);
-            transition: all 0.2s;
-        }
-        .btn-primary:hover:not(:disabled) {
-            filter: brightness(1.1);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
-        }
-        .btn-primary:active { transform: translateY(0); }
-
-        .table-header {
-            background: rgba(15, 23, 42, 0.9);
-            color: #94a3b8;
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
             font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
         }
-        .table-row {
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            transition: background 0.15s;
+        .btn-action:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(6, 182, 212, 0.4);
         }
-        .table-row:hover { background: rgba(255, 255, 255, 0.05); }
-        .table-cell { padding: 0.75rem 1rem; font-size: 0.875rem; color: #cbd5e1; }
+        .btn-action:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        @keyframes pulse-green {
-            0% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7); }
-            70% { box-shadow: 0 0 0 6px rgba(74, 222, 128, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
+        .btn-danger { background: linear-gradient(90deg, #be123c 0%, #e11d48 100%); }
+        .btn-success { background: linear-gradient(90deg, #059669 0%, #10b981 100%); }
+
+        .glass-table th {
+            background: rgba(0, 0, 0, 0.3);
+            color: #22d3ee;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
         }
-        .live-indicator {
-            width: 8px;
-            height: 8px;
-            background-color: #4ade80;
-            border-radius: 50%;
-            display: inline-block;
-            margin-right: 6px;
-            animation: pulse-green 2s infinite;
+        .glass-table tr {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            transition: background 0.2s;
         }
+        .glass-table tr:hover { background: rgba(255, 255, 255, 0.05); }
+        .glass-table td { color: #e2e8f0; font-size: 0.9rem; }
+
+        .loader {
+            border-top-color: #22d3ee;
+            -webkit-animation: spinner 1.5s linear infinite;
+            animation: spinner 1.5s linear infinite;
+        }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 
     <script type="module">
@@ -114,8 +86,14 @@
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, onSnapshot, updateDoc, deleteDoc, doc, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- Configuración ---
-        const ORIGINAL_API_KEY = "AIzaSyClcQiTJj91vzb0P5737owh4tUyJPLWgEA"; 
+        // --- CLAVES ORIGINALES ---
+        const API_KEY_GEMINI = "AIzaSyClcQiTJj91vzb0P5737owh4tUyJPLWgEA"; 
+        
+        // --- CONSTANTES DE BASE HISTÓRICA ---
+        // Estos valores se suman a lo que haya en la base de datos
+        const HISTORICAL_TOTAL = 43;
+        const HISTORICAL_WPP = 32;
+        const HISTORICAL_CALL = 0;
 
         const tecnicaturaMap = {
             'Desarrollo web': 1,
@@ -133,56 +111,45 @@
             'ID', 'Nombre Completo', 'Email', 'Teléfono', 'Tecnicatura', 
             'Estado', 'Vendedor Asignado', 'Fecha de Creación', 'Último Contacto', 'Observaciones'
         ];
-        
-        // Prompt mejorado: Énfasis en detección de carrera y preferencia neutral
-        const systemPromptForGemini = `
-            Eres un experto en clasificación de leads educativos.
-            
-            TAREA 1: CARRERA (CRÍTICO)
-            Identifica la carrera de interés basándote en palabras clave, sinónimos o carreras afines.
-            Debes mapear la intención a uno de estos nombres ESTÁNDAR:
-            - "Desarrollo web" (programación, full stack, frontend, sistemas web)
-            - "Administración de empresas" (adm, negocios, gestión, contable, pyme, asistente)
-            - "Marketing" (mkt, ventas, comercialización, redes sociales, publicidad)
-            - "Higiene y seguridad" (hys, seguridad industrial, prevención)
-            - "Gestión inmobiliaria" (martillero, corredor, propiedades, real estate)
-            - "Analista de sistemas" (informática, computación, soporte it, técnico pc)
-            - "Ciencia de datos e IA" (big data, machine learning, análisis de datos)
-            - "Recursos humanos" (rrhh, personal, talento humano)
-            
-            TAREA 2: CONTACTO
-            - "telefono": Si menciona llamar, celular, voz.
-            - "whatsapp": Si menciona escribir, wpp, mensaje.
-            - null: Si NO hay preferencia explícita. NO ASUMIR NADA.
 
-            JSON SALIDA:
-            { "nombre": string, "email": string, "telefono": string, "tecnicatura": string, "preferencia_contacto": "whatsapp" | "telefono" | null }
+        const systemPrompt = `
+            Analiza el texto. Extrae JSON: { "nombre": str, "email": str, "telefono": str, "tecnicatura": str, "preferencia": "whatsapp"|"telefono"|null }.
+            
+            1. CARRERAS (Detectar Afines):
+               - Desarrollo web (programacion, sistemas web)
+               - Administración de empresas (contable, pyme, negocios)
+               - Marketing (ventas, redes, comercializacion)
+               - Higiene y seguridad (seguridad industrial, hys)
+               - Gestión inmobiliaria (martillero, propiedades)
+               - Analista de sistemas (informatica, soporte, computacion)
+               - Ciencia de datos e IA (datos, machine learning)
+               - Recursos humanos (rrhh, personal)
+            
+            2. PREFERENCIA CONTACTO:
+               - "telefono": Si dice llamar, celular, voz.
+               - "whatsapp": Si dice escribir, wpp, mensaje, info por acá.
+               - Si no dice nada explícito, devolver null.
         `;
 
-        const jsonSchemaForGemini = {
+        const jsonSchema = {
             type: "OBJECT",
             properties: {
                 "nombre": { "type": "STRING" },
                 "email": { "type": "STRING" },
                 "telefono": { "type": "STRING" },
                 "tecnicatura": { "type": "STRING" },
-                "preferencia_contacto": { "type": "STRING", "enum": ["whatsapp", "telefono"], "nullable": true }
+                "preferencia": { "type": "STRING", "enum": ["whatsapp", "telefono"], "nullable": true }
             }
         };
 
-        // --- Estado Global ---
-        let db, auth, leadsCollectionRef;
-        let allLeads = []; 
-        let displayLeads = []; 
-        let showArchived = false;
-        let leadIdToEdit = null;
-        let leadIdToDelete = null;
+        let db, auth, leadsRef;
+        let allLeads = [];
+        let activeLeads = [];
 
-        // --- Firebase Init ---
-        async function setupFirebase() {
+        async function initApp() {
             try {
                 const firebaseConfig = {
-                    apiKey: ORIGINAL_API_KEY,
+                    apiKey: API_KEY_GEMINI,
                     authDomain: "cargadeleads.firebaseapp.com",
                     projectId: "cargadeleads",
                     storageBucket: "cargadeleads.firebasestorage.app",
@@ -195,491 +162,330 @@
                 auth = getAuth(app);
                 
                 await signInAnonymously(auth);
-                console.log("Conectado como Anónimo");
+                console.log("Conectado a Firebase");
 
-                leadsCollectionRef = collection(db, 'leads'); 
+                leadsRef = collection(db, 'leads'); 
                 
-                listenToAllLeads();
-
-            } catch (err) {
-                console.error("Firebase Critical Error:", err);
-                updateSyncStatus(false);
-                showMessage("Error Crítico de Conexión: " + err.message, true);
+                listenLeads();
+            } catch (e) {
+                alert("Error crítico de conexión: " + e.message);
             }
         }
 
-        // --- Listener ---
-        function listenToAllLeads() {
-            if (!leadsCollectionRef) return;
-            const q = query(leadsCollectionRef);
-            onSnapshot(q, (snapshot) => {
+        function listenLeads() {
+            const q = query(leadsRef);
+            onSnapshot(q, (snap) => {
                 allLeads = [];
-                snapshot.forEach((doc) => {
-                    allLeads.push({ id: doc.id, ...doc.data() });
-                });
-                allLeads.sort((a, b) => (b.fechaCreacionTimestamp || 0) - (a.fechaCreacionTimestamp || 0));
-                updateSyncStatus(true);
-                filterAndRender();
-            }, (error) => {
-                console.error("Snapshot error:", error);
-                updateSyncStatus(false);
+                snap.forEach(d => allLeads.push({ id: d.id, ...d.data() }));
+                allLeads.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+                renderUI();
             });
         }
 
-        function updateSyncStatus(connected) {
-            const el = document.getElementById('syncStatus');
-            const dot = document.getElementById('syncDot');
-            if (connected) {
-                el.textContent = "Conectado";
-                el.classList.remove('text-red-400'); el.classList.add('text-green-400');
-                dot.classList.remove('bg-red-500'); dot.classList.add('bg-green-400', 'animate-pulse');
+        function renderUI() {
+            activeLeads = allLeads.filter(l => !l.archivado);
+
+            // --- LÓGICA DE CONTADORES CON BASE HISTÓRICA ---
+            const currentTotal = allLeads.length;
+            const currentWpp = allLeads.filter(l => l.preferencia === 'whatsapp').length;
+            const currentCall = allLeads.filter(l => l.preferencia === 'telefono').length;
+
+            const totalFinal = HISTORICAL_TOTAL + currentTotal;
+            const wppFinal = HISTORICAL_WPP + currentWpp;
+            const callFinal = HISTORICAL_CALL + currentCall;
+
+            // Porcentajes
+            const wppPct = totalFinal > 0 ? Math.round((wppFinal / totalFinal) * 100) : 0;
+            const callPct = totalFinal > 0 ? Math.round((callFinal / totalFinal) * 100) : 0;
+
+            document.getElementById('countTotal').textContent = totalFinal;
+            
+            // Formato Visual: "74% (32)"
+            document.getElementById('countWpp').textContent = `${wppPct}% (${wppFinal})`;
+            document.getElementById('countCall').textContent = `${callPct}% (${callFinal})`;
+
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            
+            if(activeLeads.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" class="p-4 text-center text-gray-400">Bandeja de entrada limpia.</td></tr>';
             } else {
-                el.textContent = "Desconectado";
-                el.classList.add('text-red-400'); el.classList.remove('text-green-400');
-                dot.classList.add('bg-red-500'); dot.classList.remove('bg-green-400', 'animate-pulse');
-            }
-        }
+                activeLeads.forEach(lead => {
+                    const row = document.createElement('tr');
+                    const tecName = lead.tecnicaturaNombre || '-';
+                    
+                    let prefIcon = '';
+                    if(lead.preferencia === 'whatsapp') prefIcon = '<span class="text-green-400 font-bold">WPP</span>';
+                    if(lead.preferencia === 'telefono') prefIcon = '<span class="text-blue-400 font-bold">TEL</span>';
 
-        function filterAndRender() {
-            displayLeads = allLeads.filter(l => showArchived ? l.archivado === true : !l.archivado);
-            updateStats();
-            renderTable();
-            updateActionButtons();
-        }
-
-        // --- Estadísticas (Lógica Corregida) ---
-        function updateStats() {
-            const sourceData = allLeads; 
-            const total = sourceData.length;
-            
-            // Solo contamos si el campo tiene valor explícito
-            const whatsapp = sourceData.filter(l => l.preferencia_contacto && l.preferencia_contacto.toLowerCase() === 'whatsapp').length;
-            const telefono = sourceData.filter(l => l.preferencia_contacto && l.preferencia_contacto.toLowerCase() === 'telefono').length;
-            
-            const wppPct = total > 0 ? Math.round((whatsapp / total) * 100) : 0;
-            const telPct = total > 0 ? Math.round((telefono / total) * 100) : 0;
-
-            animateValue("statTotal", parseInt(document.getElementById("statTotal").innerText) || 0, total, 500);
-            document.getElementById("statWhatsapp").textContent = `${wppPct}% (${whatsapp})`;
-            document.getElementById("statPhone").textContent = `${telPct}% (${telefono})`;
-        }
-
-        function animateValue(id, start, end, duration) {
-            if (start === end) return;
-            const obj = document.getElementById(id);
-            if(!obj) return;
-            let startTimestamp = null;
-            const step = (timestamp) => {
-                if (!startTimestamp) startTimestamp = timestamp;
-                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-                obj.innerHTML = Math.floor(progress * (end - start) + start);
-                if (progress < 1) window.requestAnimationFrame(step);
-            };
-            window.requestAnimationFrame(step);
-        }
-
-        // --- Normalización Inteligente de Carreras (Fix Columna TEC) ---
-        function normalizeTecnicatura(rawTec) {
-            if (!rawTec) return '';
-            const lower = rawTec.toLowerCase().trim();
-            
-            // 1. Busqueda Exacta (Case Insensitive) en el Mapa
-            const exactMatch = Object.keys(tecnicaturaMap).find(key => key.toLowerCase() === lower);
-            if (exactMatch) return exactMatch;
-
-            // 2. Busqueda por Palabras Clave (Fuzzy)
-            if (lower.includes('web') || lower.includes('program') || lower.includes('stack') || lower.includes('full')) return 'Desarrollo web';
-            if (lower.includes('adm') || lower.includes('empresa') || lower.includes('negocio') || lower.includes('pyme') || lower.includes('contab')) return 'Administración de empresas';
-            if (lower.includes('mkt') || lower.includes('market') || lower.includes('venta') || lower.includes('comercial')) return 'Marketing';
-            if (lower.includes('hig') || lower.includes('segurid') || lower.includes('hys') || lower.includes('prevenc')) return 'Higiene y seguridad';
-            if (lower.includes('inmobi') || lower.includes('martillero') || lower.includes('propied') || lower.includes('corredor')) return 'Gestión inmobiliaria';
-            if (lower.includes('sist') || lower.includes('compu') || lower.includes('info') || lower.includes('tecnic')) return 'Analista de sistemas';
-            if (lower.includes('dato') || lower.includes('data') || lower.includes('ia') || lower.includes('analisis')) return 'Ciencia de datos e IA';
-            if (lower.includes('rrhh') || lower.includes('human') || lower.includes('person') || lower.includes('talento')) return 'Recursos humanos';
-            
-            return rawTec; // Fallback: Devuelve lo que encontró la IA si no machea
-        }
-
-        // --- Guardado Seguro ---
-        async function processAndSaveLead(parsedData, showDuplicateMessage = false) {
-            if (!parsedData) return false;
-            
-            const duplicate = checkIfLeadExists(parsedData.email, parsedData.telefono);
-            if (duplicate) {
-                if (showDuplicateMessage) showMessage(duplicate, true);
-                return false;
-            }
-
-            try {
-                // Paso 1: Normalizar el nombre de la carrera
-                let tecnicaturaNombre = normalizeTecnicatura(parsedData.tecnicatura);
-                // Paso 2: Obtener el ID
-                let tecnicaturaId = tecnicaturaMap[tecnicaturaNombre] || '';
-
-                const timestamp = Date.now();
-                const fechaFormateada = new Date(timestamp).toLocaleDateString('es-AR', {
-                    day: '2-digit', month: '2-digit', year: 'numeric'
+                    row.innerHTML = `
+                        <td class="p-3 text-xs font-mono text-gray-400">${lead.id.substring(0,4)}</td>
+                        <td class="p-3 font-medium">${lead.nombre}</td>
+                        <td class="p-3 text-xs">${lead.email}</td>
+                        <td class="p-3 text-xs">${lead.telefono}</td>
+                        <td class="p-3 text-xs text-cyan-300">${tecName}</td>
+                        <td class="p-3 text-xs">${prefIcon}</td>
+                        <td class="p-3 text-xs">${lead.fecha}</td>
+                        <td class="p-3 text-xs italic opacity-70 truncate max-w-[150px]">${lead.observacion}</td>
+                        <td class="p-3 text-center">
+                            <button onclick="window.archivarLead('${lead.id}')" class="text-red-400 hover:text-red-200 text-xs uppercase font-bold bg-white/10 px-2 py-1 rounded">Archivar</button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
                 });
-
-                const observacionesAuto = buildObservaciones(parsedData);
-
-                // Forzamos null si no viene nada, para no contar en stats
-                const prefContacto = parsedData.preferencia_contacto || null;
-
-                const newLead = {
-                    nombreCompleto: parsedData.nombre || 'Desconocido',
-                    email: parsedData.email || '',
-                    telefono: parsedData.telefono || '',
-                    tecnicaturaId: tecnicaturaId,
-                    estado: 'sin_contacto',
-                    vendedorAsignado: '',
-                    fechaCreacion: fechaFormateada,
-                    fechaCreacionTimestamp: timestamp,
-                    ultimoContacto: '',
-                    observaciones: observacionesAuto,
-                    preferencia_contacto: prefContacto,
-                    archivado: false 
-                };
-                
-                if (!leadsCollectionRef) throw new Error("Base de datos no conectada.");
-                
-                addDoc(leadsCollectionRef, newLead).catch(err => {
-                    console.error("Error save:", err);
-                    showMessage("Error guardando.", true);
-                });
-                
-                return true;
-            } catch (err) {
-                console.error("Error process:", err);
-                showMessage("Error: " + err.message, true);
-                return false;
             }
+            
+            document.getElementById('btnDownload').disabled = activeLeads.length === 0;
+            document.getElementById('btnClean').disabled = activeLeads.length === 0;
         }
 
-        function buildObservaciones(parsedData) {
-            const prefix = "Ingresa por WhatsApp Comercial: ";
-            let content = "Consulta general.";
-            const pref = (parsedData.preferencia_contacto || '').toLowerCase();
-
-            if (pref === 'whatsapp') {
-                content = "Manifiesta que la contacten por WhatsApp.";
-            } else if (pref === 'telefono') {
-                content = "Manifiesta que prefiere por esa vía.";
-            }
-            return `${prefix}${content}`;
-        }
-
-        function checkIfLeadExists(email, phone) {
-            const newEmail = email ? email.trim() : '';
-            const newPhone = phone ? phone.trim() : '';
-            if (!newEmail && !newPhone) return null;
-            const activeLeads = allLeads.filter(l => !l.archivado);
-            if (newEmail && activeLeads.some(l => l.email === newEmail)) return `Ya existe email: ${newEmail}`;
-            if (newPhone && activeLeads.some(l => l.telefono === newPhone)) return `Ya existe teléfono: ${newPhone}`;
-            return null;
-        }
-
-        // --- Handlers UI ---
-        window.handleProcesarClick = async () => {
-            const input = document.getElementById('mensajeInput');
+        window.procesar = async () => {
+            const input = document.getElementById('inputMsg');
             const txt = input.value;
-            if (!txt.trim()) return showMessage("Ingresa texto.", true);
-            if(!leadsCollectionRef) return showMessage("Sin conexión DB.", true);
-
-            showLoader(true);
+            if(!txt.trim()) return alert("Escribe algo.");
+            
+            toggleLoader(true);
             try {
-                const parsed = await parseWithGemini(txt);
-                if (await processAndSaveLead(parsed, true)) {
-                    input.value = '';
-                    showMessage("Guardado correctamente.", false);
-                }
-            } catch (e) { showMessage(e.message, true); } 
-            finally { showLoader(false); }
+                const parsed = await callGemini(txt);
+                
+                const tecName = normalizeTec(parsed.tecnicatura);
+                const tecId = tecnicaturaMap[tecName] || '';
+                const pref = parsed.preferencia || null; 
+                
+                let obsText = "Consulta general.";
+                if (pref === 'whatsapp') obsText = "Manifiesta que la contacten por WhatsApp.";
+                if (pref === 'telefono') obsText = "Manifiesta que prefiere por esa vía (Llamada).";
+                obsText += " Consulta por WhatsApp";
+
+                const newDoc = {
+                    nombre: parsed.nombre || 'Desconocido',
+                    email: parsed.email || '',
+                    telefono: parsed.telefono || '',
+                    tecnicaturaNombre: tecName,
+                    tecnicaturaId: tecId,
+                    preferencia: pref,
+                    observacion: obsText,
+                    fecha: new Date().toLocaleDateString('es-AR'),
+                    timestamp: Date.now(),
+                    archivado: false,
+                    estado: 'Nuevo',
+                    vendedor: ''
+                };
+
+                await addDoc(leadsRef, newDoc);
+                input.value = '';
+                
+            } catch (e) {
+                alert("Error: " + e.message);
+            } finally {
+                toggleLoader(false);
+            }
         };
 
-        window.handleDescargar = () => {
-            if (displayLeads.length === 0) return;
-            const data = displayLeads.map(l => ({
-                'ID': l.id.substring(0,5).toUpperCase(),
-                'Nombre Completo': l.nombreCompleto,
+        window.archivarLead = async (id) => {
+            if(!confirm("¿Archivar este lead? Desaparecerá de la lista pero contará en estadísticas.")) return;
+            await updateDoc(doc(db, 'leads', id), { archivado: true });
+        };
+
+        window.limpiarPantalla = async () => {
+            if(!confirm("Esto archivará TODOS los leads visibles. No se borrarán del historial.")) return;
+            const batch = writeBatch(db);
+            activeLeads.forEach(l => {
+                batch.update(doc(db, 'leads', l.id), { archivado: true });
+            });
+            await batch.commit();
+        };
+
+        window.descargarExcel = () => {
+            const data = activeLeads.map(l => ({
+                'ID': l.id.substring(0,5),
+                'Nombre Completo': l.nombre,
                 'Email': l.email,
                 'Teléfono': l.telefono,
-                'Tecnicatura': l.tecnicaturaId || '', // ID numérico
+                'Tecnicatura': l.tecnicaturaId, 
                 'Estado': l.estado,
-                'Vendedor Asignado': l.vendedorAsignado,
-                'Fecha de Creación': l.fechaCreacion,
-                'Último Contacto': l.ultimoContacto,
-                'Observaciones': l.observaciones
+                'Vendedor Asignado': l.vendedor,
+                'Fecha de Creación': l.fecha,
+                'Último Contacto': '',
+                'Observaciones': l.observacion 
             }));
-            const ws = XLSX.utils.json_to_sheet(data, { header: excelHeaders });
+            const ws = XLSX.utils.json_to_sheet(data);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Leads");
-            XLSX.writeFile(wb, showArchived ? "Historial.xlsx" : "Leads.xlsx");
+            XLSX.writeFile(wb, "Leads_Cervantes.xlsx");
         };
 
-        // --- Render ---
-        function renderTable() {
-            const tbody = document.getElementById('leadsTableBody');
-            tbody.innerHTML = '';
-            if (displayLeads.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="11" class="text-center p-8 text-gray-500 italic">Sin datos.</td></tr>`;
-                return;
-            }
-            displayLeads.forEach(lead => {
-                const tr = document.createElement('tr');
-                tr.className = "table-row group";
-                
-                // Botones
-                let btns = '';
-                if (showArchived) {
-                    btns = `<button onclick="handleRestore('${lead.id}')" class="text-green-400 hover:text-green-300 p-1" title="Restaurar"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></button>
-                            <button onclick="handleDeleteClick('${lead.id}', '${lead.nombreCompleto}')" class="text-red-400 hover:text-red-300 p-1" title="Borrar"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>`;
-                } else {
-                    btns = `<button onclick="handleEditClick('${lead.id}')" class="text-blue-400 hover:text-blue-300 p-1" title="Editar"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
-                            <button onclick="handleDeleteClick('${lead.id}', '${lead.nombreCompleto}')" class="text-gray-500 hover:text-red-400 p-1" title="Archivar"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>`;
+        function normalizeTec(raw) {
+            if(!raw) return '';
+            const s = raw.toLowerCase();
+            if(s.includes('web') || s.includes('prog')) return 'Desarrollo web';
+            if(s.includes('adm') || s.includes('empresa')) return 'Administración de empresas';
+            if(s.includes('mkt') || s.includes('market')) return 'Marketing';
+            if(s.includes('hig') || s.includes('segur')) return 'Higiene y seguridad';
+            if(s.includes('inmob') || s.includes('marti')) return 'Gestión inmobiliaria';
+            if(s.includes('sist') || s.includes('analist')) return 'Analista de sistemas';
+            if(s.includes('dat') || s.includes('ia')) return 'Ciencia de datos e IA';
+            if(s.includes('rrhh') || s.includes('recurs')) return 'Recursos humanos';
+            return raw;
+        }
+
+        async function callGemini(text) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${API_KEY_GEMINI}`;
+            const body = {
+                contents: [{ parts: [{ text }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: { responseMimeType: "application/json", responseSchema: jsonSchema }
+            };
+            const r = await fetch(url, { method: 'POST', body: JSON.stringify(body), headers: {'Content-Type':'application/json'} });
+            const j = await r.json();
+            return JSON.parse(j.candidates[0].content.parts[0].text);
+        }
+
+        function toggleLoader(show) {
+            document.getElementById('loaderOverlay').style.display = show ? 'flex' : 'none';
+        }
+
+        document.addEventListener('DOMContentLoaded', initApp);
+        
+        document.addEventListener('paste', (e) => {
+            const items = e.clipboardData.items;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf("image") !== -1) {
+                    const blob = items[i].getAsFile();
+                    const reader = new FileReader();
+                    reader.onload = async (event) => {
+                        toggleLoader(true);
+                        const base64 = event.target.result.split(',')[1];
+                        try {
+                            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${API_KEY_GEMINI}`;
+                            const body = {
+                                contents: [{ parts: [{text: "Extrae JSON"}, {inlineData: {mimeType: blob.type, data: base64}}] }],
+                                systemInstruction: { parts: [{ text: systemPrompt }] },
+                                generationConfig: { responseMimeType: "application/json", responseSchema: jsonSchema }
+                            };
+                            const r = await fetch(url, { method: 'POST', body: JSON.stringify(body), headers: {'Content-Type':'application/json'} });
+                            const j = await r.json();
+                            const parsed = JSON.parse(j.candidates[0].content.parts[0].text);
+                            
+                            const tecName = normalizeTec(parsed.tecnicatura);
+                            const tecId = tecnicaturaMap[tecName] || '';
+                            let obsText = "Consulta general.";
+                            if (parsed.preferencia === 'whatsapp') obsText = "Manifiesta que la contacten por WhatsApp.";
+                            if (parsed.preferencia === 'telefono') obsText = "Manifiesta que prefiere por esa vía (Llamada).";
+                            obsText += " Consulta por WhatsApp";
+
+                            const newDoc = {
+                                nombre: parsed.nombre || 'Desconocido',
+                                email: parsed.email || '',
+                                telefono: parsed.telefono || '',
+                                tecnicaturaNombre: tecName,
+                                tecnicaturaId: tecId,
+                                preferencia: parsed.preferencia || null,
+                                observacion: obsText,
+                                fecha: new Date().toLocaleDateString('es-AR'),
+                                timestamp: Date.now(),
+                                archivado: false,
+                                estado: 'Nuevo',
+                                vendedor: ''
+                            };
+                            await addDoc(leadsRef, newDoc);
+                        } catch(e) { alert("Error imagen: " + e.message); }
+                        finally { toggleLoader(false); }
+                    };
+                    reader.readAsDataURL(blob);
                 }
-
-                let statusColor = 'bg-gray-700 text-gray-300';
-                if (lead.estado === 'contactado') statusColor = 'bg-blue-900 text-blue-200';
-                if (lead.estado === 'matriculado') statusColor = 'bg-green-900 text-green-200';
-                if (lead.estado === 'interesado') statusColor = 'bg-yellow-900 text-yellow-200';
-
-                // Nombre de la carrera para mostrar en tabla (no ID)
-                const tecNombre = tecnicaturaNameMap[lead.tecnicaturaId] || lead.tecnicaturaId || '-';
-
-                tr.innerHTML = `
-                    <td class="table-cell font-mono text-xs opacity-70">${lead.id.substring(0,4)}</td>
-                    <td class="table-cell font-medium text-white">${lead.nombreCompleto}</td>
-                    <td class="table-cell text-xs">${lead.email}</td>
-                    <td class="table-cell text-xs">${lead.telefono}</td>
-                    <td class="table-cell text-xs text-sky-300">${tecNombre}</td>
-                    <td class="table-cell"><span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wide ${statusColor}">${lead.estado}</span></td>
-                    <td class="table-cell text-xs">${lead.vendedorAsignado}</td>
-                    <td class="table-cell text-xs opacity-70">${lead.fechaCreacion}</td>
-                    <td class="table-cell text-[10px] max-w-[150px] truncate" title="${lead.observaciones}">${lead.observaciones}</td>
-                    <td class="table-cell text-center flex justify-center gap-1 opacity-60 group-hover:opacity-100 transition">${btns}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        function updateActionButtons() {
-            const hasData = displayLeads.length > 0;
-            document.getElementById('descargarBtn').disabled = !hasData;
-            document.getElementById('archivarTodoBtn').disabled = !hasData;
-        }
-
-        // --- Helpers UI ---
-        function showLoader(s) { document.getElementById('loader').classList.toggle('hidden', !s); }
-        function showMessage(m, e) {
-            const b = document.getElementById('messageBox');
-            document.getElementById('messageText').textContent = m;
-            b.className = `fixed bottom-4 right-4 z-50 px-6 py-4 rounded-lg shadow-2xl backdrop-blur-xl border flex items-center gap-3 transition-all duration-300 ${e ? 'bg-red-900/90 border-red-500 text-white' : 'bg-teal-900/90 border-teal-500 text-white'}`;
-            b.classList.remove('hidden'); setTimeout(() => b.classList.add('hidden'), 5000);
-        }
-
-        // --- Edit / Delete ---
-        window.handleEditClick = (id) => {
-            const lead = allLeads.find(l => l.id === id); if (!lead) return;
-            leadIdToEdit = id;
-            document.getElementById('editNombre').value = lead.nombreCompleto;
-            document.getElementById('editEmail').value = lead.email;
-            document.getElementById('editTelefono').value = lead.telefono;
-            document.getElementById('editEstado').value = lead.estado;
-            document.getElementById('editVendedor').value = lead.vendedorAsignado;
-            document.getElementById('editObservaciones').value = lead.observaciones;
-            document.getElementById('editTecnicatura').value = tecnicaturaNameMap[lead.tecnicaturaId] || "";
-            document.getElementById('editModal').classList.remove('hidden');
-        };
-
-        window.saveEdit = async () => {
-            if (!leadIdToEdit) return; showLoader(true);
-            try {
-                const tecName = document.getElementById('editTecnicatura').value;
-                const tecId = tecnicaturaMap[tecName] || '';
-                const updatedData = {
-                    nombreCompleto: document.getElementById('editNombre').value,
-                    email: document.getElementById('editEmail').value,
-                    telefono: document.getElementById('editTelefono').value,
-                    tecnicaturaId: tecId,
-                    estado: document.getElementById('editEstado').value,
-                    vendedorAsignado: document.getElementById('editVendedor').value,
-                    observaciones: document.getElementById('editObservaciones').value
-                };
-                await updateDoc(doc(leadsCollectionRef, leadIdToEdit), updatedData);
-                document.getElementById('editModal').classList.add('hidden');
-                showMessage("Actualizado.", false);
-            } catch (e) { showMessage(e.message, true); } finally { showLoader(false); leadIdToEdit = null; }
-        };
-
-        window.handleDeleteClick = (id, name) => {
-            leadIdToDelete = id;
-            document.getElementById('deleteLeadName').textContent = name;
-            const modalTitle = document.querySelector('#confirmDeleteOneModal h3');
-            const modalBtn = document.querySelector('#confirmDeleteOneModal button.bg-red-600');
-            if (showArchived) { modalTitle.textContent = "Eliminar Definitivamente"; modalBtn.textContent = "Eliminar"; }
-            else { modalTitle.textContent = "Archivar Lead"; modalBtn.textContent = "Archivar"; }
-            document.getElementById('confirmDeleteOneModal').classList.remove('hidden');
-        };
-
-        window.confirmDeleteOne = async () => {
-            if (!leadIdToDelete) return; showLoader(true);
-            try {
-                const docRef = doc(leadsCollectionRef, leadIdToDelete);
-                if (showArchived) { await deleteDoc(docRef); showMessage("Eliminado.", false); }
-                else { await updateDoc(docRef, { archivado: true }); showMessage("Archivado.", false); }
-                document.getElementById('confirmDeleteOneModal').classList.add('hidden');
-            } catch (e) { showMessage(e.message, true); } finally { showLoader(false); leadIdToDelete = null; }
-        };
-
-        window.handleRestore = async (id) => {
-            showLoader(true);
-            try { await updateDoc(doc(leadsCollectionRef, id), { archivado: false }); showMessage("Restaurado.", false); }
-            catch (e) { showMessage(e.message, true); } finally { showLoader(false); }
-        };
-
-        window.toggleArchivedView = () => {
-            showArchived = !showArchived;
-            const btn = document.getElementById('toggleArchivedBtn');
-            const title = document.getElementById('tableTitle');
-            const archBtn = document.getElementById('archivarTodoBtn');
-            if (showArchived) { btn.textContent = "Ver Activos"; btn.classList.add('bg-blue-600', 'text-white'); btn.classList.remove('bg-gray-700', 'text-gray-300'); title.textContent = "Historial (Archivados)"; title.classList.add('text-orange-400'); archBtn.classList.add('hidden'); }
-            else { btn.textContent = "Ver Historial"; btn.classList.remove('bg-blue-600', 'text-white'); btn.classList.add('bg-gray-700', 'text-gray-300'); title.textContent = "Base de Datos"; title.classList.remove('text-orange-400'); archBtn.classList.remove('hidden'); }
-            filterAndRender();
-        };
-
-        window.confirmArchiveAll = async () => {
-             document.getElementById('confirmModal').classList.add('hidden');
-             const toArchive = allLeads.filter(l => !l.archivado);
-             if (toArchive.length === 0) return; showLoader(true);
-             try {
-                 const batch = writeBatch(db);
-                 toArchive.forEach(l => batch.update(doc(leadsCollectionRef, l.id), { archivado: true }));
-                 await batch.commit(); showMessage("Archivados.", false);
-             } catch(e) { showMessage(e.message, true); } finally { showLoader(false); }
-        };
-
-        async function parseWithGemini(text, isImage, mimeType) {
-            const usedKey = ORIGINAL_API_KEY;
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${usedKey}`;
-            const parts = isImage ? [{ text: "Extrae JSON." }, { inlineData: { mimeType, data: text } }] : [{ text }];
-            const payload = { contents: [{ parts }], systemInstruction: { parts: [{ text: systemPromptForGemini }] }, generationConfig: { responseMimeType: "application/json", responseSchema: jsonSchemaForGemini } };
-            const res = await fetch(url, { method: 'POST', body: JSON.stringify(payload), headers: {'Content-Type': 'application/json'} });
-            const json = await res.json();
-            return JSON.parse(json.candidates[0].content.parts[0].text);
-        }
-
-        // Init
-        document.addEventListener('DOMContentLoaded', () => {
-            setupFirebase();
-            const imgInput = document.getElementById('imagenInput'); const xlsInput = document.getElementById('excelInput');
-            document.getElementById('procesarImagenBtn').onclick = () => imgInput.click();
-            document.getElementById('procesarExcelBtn').onclick = () => xlsInput.click();
-            imgInput.onchange = (e) => handleFile(e.target.files[0], 'image');
-            xlsInput.onchange = (e) => handleFile(e.target.files[0], 'excel');
-            document.getElementById('mensajeInput').addEventListener('paste', (e) => {
-                const item = Array.from(e.clipboardData.items).find(i => i.type.startsWith('image/'));
-                if (item) handleFile(item.getAsFile(), 'image');
-            });
+            }
         });
-
-        async function handleFile(file, type) {
-            if(!file) return; showLoader(true);
-            try {
-                const reader = new FileReader();
-                reader.onload = async (e) => {
-                    if (type === 'image') {
-                        const parsed = await parseWithGemini(e.target.result.split(',')[1], true, file.type);
-                        await processAndSaveLead(parsed, true); showMessage("Imagen OK.", false);
-                    } else {
-                        const wb = XLSX.read(e.target.result, {type:'array'});
-                        const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-                        let c = 0; for(let r of rows) { const txt = Object.values(r).join(' '); if(await processAndSaveLead(await parseWithGemini(txt), false)) c++; }
-                        showMessage(`Excel: ${c} OK.`, false);
-                    }
-                    showLoader(false);
-                };
-                type === 'image' ? reader.readAsDataURL(file) : reader.readAsArrayBuffer(file);
-            } catch(e) { showLoader(false); showMessage("Error archivo.", true); }
-        }
     </script>
 </head>
-<body class="p-4 md:p-6 overflow-hidden">
+<body class="p-6">
 
-    <!-- Dashboard Layout -->
-    <div class="max-w-[1600px] mx-auto h-[95vh] flex flex-col gap-6">
-        <header class="glass-panel p-6 flex justify-between items-center shrink-0">
-            <div><h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-sky-400 to-teal-400">Convertidor de WhatsApp a Leads</h1><p class="text-sm text-slate-400 mt-1">Dpto. Comercial • v7.2 Precision Fix</p></div>
-            <div class="flex items-center gap-2 bg-slate-900/50 px-4 py-2 rounded-full border border-slate-700/50"><div id="syncDot" class="w-2.5 h-2.5 rounded-full bg-red-500"></div><span id="syncStatus" class="text-xs font-mono text-red-400 tracking-wider uppercase">Desconectado</span></div>
+    <!-- Loader -->
+    <div id="loaderOverlay" class="fixed inset-0 bg-black/80 z-50 hidden flex-col items-center justify-center backdrop-blur-sm">
+        <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-16 w-16 mb-4"></div>
+        <h2 class="text-cyan-400 font-bold text-xl animate-pulse">Procesando Lead...</h2>
+    </div>
+
+    <div class="max-w-7xl mx-auto space-y-6">
+        
+        <!-- Header -->
+        <header class="flex justify-between items-end pb-4 border-b border-white/10">
+            <div>
+                <h1 class="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-300 to-blue-400">
+                    Procesador de Leads
+                </h1>
+                <p class="text-blue-200 opacity-80 mt-1">Versión 8.1 • Historical Offset</p>
+            </div>
         </header>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 shrink-0">
-            <div class="stat-card p-5 flex flex-col items-center justify-center text-center group"><span class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Procesados (Histórico)</span><span id="statTotal" class="text-4xl font-bold text-white group-hover:scale-110 transition-transform">0</span></div>
-            <div class="stat-card p-5 flex flex-col items-center justify-center text-center group"><span class="text-xs font-bold text-green-400/80 uppercase tracking-widest mb-1">WhatsApp</span><span id="statWhatsapp" class="text-4xl font-bold text-green-400 group-hover:scale-110 transition-transform">0%</span></div>
-            <div class="stat-card p-5 flex flex-col items-center justify-center text-center group"><span class="text-xs font-bold text-sky-400/80 uppercase tracking-widest mb-1">Llamados</span><span id="statPhone" class="text-4xl font-bold text-sky-400 group-hover:scale-110 transition-transform">0%</span></div>
+        <!-- Stats Panel -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="glass-panel p-6 flex flex-col items-center justify-center">
+                <span class="text-blue-300 text-sm font-bold uppercase tracking-widest">Total Procesados (Histórico)</span>
+                <span id="countTotal" class="text-5xl font-bold text-white mt-2 drop-shadow-lg">43</span>
+            </div>
+            <div class="glass-panel p-6 flex flex-col items-center justify-center border-l-4 border-green-400">
+                <span class="text-green-300 text-sm font-bold uppercase tracking-widest">WhatsApp</span>
+                <span id="countWpp" class="text-5xl font-bold text-green-400 mt-2 drop-shadow-lg">74% (32)</span>
+            </div>
+            <div class="glass-panel p-6 flex flex-col items-center justify-center border-l-4 border-blue-400">
+                <span class="text-blue-300 text-sm font-bold uppercase tracking-widest">Llamados</span>
+                <span id="countCall" class="text-5xl font-bold text-blue-400 mt-2 drop-shadow-lg">0% (0)</span>
+            </div>
         </div>
 
-        <div class="flex flex-col lg:flex-row gap-6 flex-grow min-h-0">
-            <div class="lg:w-1/3 glass-panel p-6 flex flex-col gap-4 shrink-0">
-                <h2 class="text-lg font-semibold text-white mb-2">Ingreso Inteligente</h2>
-                <textarea id="mensajeInput" class="dashboard-input w-full flex-grow rounded-xl p-4 resize-none text-sm font-mono leading-relaxed" placeholder="Pega aquí el texto de WhatsApp..."></textarea>
-                <button onclick="handleProcesarClick()" class="btn-primary w-full py-3 rounded-xl font-bold text-white shadow-lg flex items-center justify-center gap-2"><svg class="w-5 h-5 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>Procesar con IA</button>
-                <div class="grid grid-cols-2 gap-3 mt-2"><button id="procesarExcelBtn" class="dashboard-input py-3 rounded-lg text-xs font-bold text-teal-300 hover:bg-teal-900/30 flex items-center justify-center gap-2">Importar Excel</button><button id="procesarImagenBtn" class="dashboard-input py-3 rounded-lg text-xs font-bold text-indigo-300 hover:bg-indigo-900/30 flex items-center justify-center gap-2">Subir Imagen</button></div>
-                <input type="file" id="excelInput" class="hidden" accept=".xlsx,.xls"><input type="file" id="imagenInput" class="hidden" accept="image/*">
+        <!-- Main Area -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[600px]">
+            
+            <!-- Input Area -->
+            <div class="glass-panel p-6 flex flex-col gap-4">
+                <h2 class="text-xl font-bold text-cyan-100 flex items-center gap-2">
+                    <span>📥</span> Ingreso de Datos
+                </h2>
+                <textarea id="inputMsg" class="glass-input w-full flex-grow rounded-xl p-4 resize-none text-sm leading-relaxed" 
+                    placeholder="Pega aquí el mensaje de WhatsApp, correo o presiona CTRL+V para pegar una imagen..."></textarea>
+                <button onclick="procesar()" class="btn-action py-3 rounded-xl shadow-lg text-lg flex items-center justify-center gap-2">
+                    <span>✨</span> Procesar con IA
+                </button>
             </div>
 
-            <div class="lg:w-2/3 glass-panel flex flex-col overflow-hidden">
-                <div class="p-4 border-b border-white/5 flex justify-between items-center bg-slate-900/30">
-                    <div><h2 id="tableTitle" class="text-lg font-semibold text-white">Base de Datos</h2></div>
-                    <div class="flex gap-3">
-                        <button id="archivarTodoBtn" onclick="document.getElementById('confirmModal').classList.remove('hidden')" class="bg-orange-600 hover:bg-orange-500 text-white px-3 py-1.5 rounded text-xs font-bold shadow-lg flex items-center gap-1">Archivar Todo</button>
-                        <button id="toggleArchivedBtn" onclick="toggleArchivedView()" class="dashboard-input px-3 py-1.5 rounded text-xs font-medium hover:bg-white/10">Ver Historial</button>
-                        <button id="descargarBtn" onclick="handleDescargar()" disabled class="bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded text-xs font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1">Excel</button>
+            <!-- Table Area -->
+            <div class="glass-panel p-6 lg:col-span-2 flex flex-col">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-cyan-100">Bandeja de Entrada (Activos)</h2>
+                    <div class="flex gap-2">
+                        <button id="btnClean" onclick="limpiarPantalla()" disabled class="btn-danger px-4 py-2 rounded-lg text-sm shadow-lg font-bold">
+                            🧹 Limpiar Pantalla (Archivar)
+                        </button>
+                        <button id="btnDownload" onclick="descargarExcel()" disabled class="btn-success px-4 py-2 rounded-lg text-sm shadow-lg font-bold flex items-center gap-2">
+                            <span>📊</span> Descargar Excel
+                        </button>
                     </div>
                 </div>
-                <div class="overflow-auto flex-grow bg-slate-900/20">
-                    <table class="w-full text-left border-collapse"><thead class="sticky top-0 z-10"><tr class="table-header"><th class="p-3">ID</th><th class="p-3">Nombre</th><th class="p-3">Email</th><th class="p-3">Tel</th><th class="p-3">Tec</th><th class="p-3">Estado</th><th class="p-3">Vend</th><th class="p-3">Fecha</th><th class="p-3">Obs</th><th class="p-3 text-center">Acción</th></tr></thead><tbody id="leadsTableBody"></tbody></table>
+                
+                <div class="overflow-auto flex-grow rounded-lg border border-white/10">
+                    <table class="w-full glass-table text-left border-collapse">
+                        <thead class="sticky top-0 z-10 backdrop-blur-md">
+                            <tr>
+                                <th class="p-3">ID</th>
+                                <th class="p-3">Nombre</th>
+                                <th class="p-3">Email</th>
+                                <th class="p-3">Tel</th>
+                                <th class="p-3">Tec</th>
+                                <th class="p-3">Pref</th>
+                                <th class="p-3">Fecha</th>
+                                <th class="p-3">Obs</th>
+                                <th class="p-3 text-center">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <!-- JS Injected -->
+                        </tbody>
+                    </table>
                 </div>
-                <div class="p-2 bg-slate-900/40 border-t border-white/5 text-[10px] text-center text-slate-500 font-mono">Conectado a Firestore (Stable Mode)</div>
             </div>
         </div>
-    </div>
 
-    <!-- Components (Loader, Modals, etc) -->
-    <div id="loader" class="hidden fixed inset-0 z-[60] bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center"><div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-sky-500 mb-4"></div><p class="text-white font-mono animate-pulse">Procesando...</p></div>
-    <div id="messageBox" class="hidden"><span id="messageText" class="font-medium text-sm"></span></div>
-
-    <!-- Edit Modal -->
-    <div id="editModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-        <div class="bg-slate-800 rounded-2xl shadow-2xl border border-white/10 w-full max-w-lg p-6">
-            <h3 class="text-xl font-bold text-white mb-6">Editar Lead</h3>
-            <div class="space-y-4">
-                <input type="text" id="editNombre" class="dashboard-input w-full p-3 rounded-lg" placeholder="Nombre">
-                <div class="grid grid-cols-2 gap-4"><input type="email" id="editEmail" class="dashboard-input w-full p-3 rounded-lg" placeholder="Email"><input type="text" id="editTelefono" class="dashboard-input w-full p-3 rounded-lg" placeholder="Teléfono"></div>
-                <select id="editTecnicatura" class="dashboard-input w-full p-3 rounded-lg bg-slate-800"><option value="">-- Tecnicatura --</option><option value="Desarrollo web">Desarrollo web</option><option value="Administración de empresas">Administración de empresas</option><option value="Marketing">Marketing</option><option value="Higiene y seguridad">Higiene y seguridad</option><option value="Gestión inmobiliaria">Gestión inmobiliaria</option><option value="Analista de sistemas">Analista de sistemas</option><option value="Ciencia de datos e IA">Ciencia de datos e IA</option><option value="Recursos humanos">Recursos humanos</option></select>
-                <div class="grid grid-cols-2 gap-4"><select id="editEstado" class="dashboard-input w-full p-3 rounded-lg bg-slate-800"><option value="sin_contacto">Sin Contacto</option><option value="contactado">Contactado</option><option value="interesado">Interesado</option><option value="matriculado">Matriculado</option><option value="descartado">Descartado</option></select><input type="text" id="editVendedor" class="dashboard-input w-full p-3 rounded-lg" placeholder="Vendedor"></div>
-                <textarea id="editObservaciones" rows="3" class="dashboard-input w-full p-3 rounded-lg" placeholder="Observaciones"></textarea>
-            </div>
-            <div class="mt-6 flex justify-end gap-3"><button onclick="document.getElementById('editModal').classList.add('hidden')" class="px-4 py-2 rounded-lg bg-slate-700 text-white">Cancelar</button><button onclick="saveEdit()" class="px-4 py-2 rounded-lg bg-sky-600 text-white">Guardar</button></div>
-        </div>
-    </div>
-
-    <!-- Confirm Archive -->
-    <div id="confirmModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-        <div class="bg-slate-800 rounded-xl shadow-2xl border border-orange-500/30 p-6 max-w-sm mx-4 text-center">
-            <h3 class="text-lg font-bold text-orange-400">📦 Archivar Todo</h3>
-            <p class="text-sm text-slate-400 mt-2">Los leads activos se moverán al historial.</p>
-            <div class="mt-6 flex justify-center gap-3"><button onclick="document.getElementById('confirmModal').classList.add('hidden')" class="px-4 py-2 bg-slate-700 text-white rounded-lg">Cancelar</button><button onclick="confirmArchiveAll()" class="px-4 py-2 bg-orange-600 text-white rounded-lg">Sí, Archivar</button></div>
-        </div>
-    </div>
-
-    <!-- Confirm Delete -->
-    <div id="confirmDeleteOneModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-        <div class="bg-slate-800 rounded-xl shadow-2xl p-6 max-w-sm mx-4 text-center border border-white/10">
-            <h3 class="text-lg font-bold text-white">¿Confirmar?</h3>
-            <p class="text-sm text-slate-400 mt-2">Lead: <strong id="deleteLeadName" class="text-sky-300"></strong></p>
-            <div class="mt-6 flex justify-center gap-3"><button onclick="document.getElementById('confirmDeleteOneModal').classList.add('hidden')" class="px-4 py-2 bg-slate-700 text-white rounded-lg">Cancelar</button><button onclick="confirmDeleteOne()" class="px-4 py-2 bg-red-600 text-white rounded-lg">Confirmar</button></div>
-        </div>
     </div>
 
 </body>
