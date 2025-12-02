@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Procesador de Leads v8.1 - Historical Offset</title>
+    <title>Procesador de Leads v8.2 - Stable Fix</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- SheetJS -->
@@ -90,7 +90,6 @@
         const API_KEY_GEMINI = "AIzaSyClcQiTJj91vzb0P5737owh4tUyJPLWgEA"; 
         
         // --- CONSTANTES DE BASE HISTÓRICA ---
-        // Estos valores se suman a lo que haya en la base de datos
         const HISTORICAL_TOTAL = 43;
         const HISTORICAL_WPP = 32;
         const HISTORICAL_CALL = 0;
@@ -246,12 +245,15 @@
             
             toggleLoader(true);
             try {
+                // 1. Llamada a Gemini (Con Catch Específico)
                 const parsed = await callGemini(txt);
                 
+                // 2. Normalizar datos
                 const tecName = normalizeTec(parsed.tecnicatura);
                 const tecId = tecnicaturaMap[tecName] || '';
                 const pref = parsed.preferencia || null; 
                 
+                // 3. Crear Observación
                 let obsText = "Consulta general.";
                 if (pref === 'whatsapp') obsText = "Manifiesta que la contacten por WhatsApp.";
                 if (pref === 'telefono') obsText = "Manifiesta que prefiere por esa vía (Llamada).";
@@ -276,7 +278,8 @@
                 input.value = '';
                 
             } catch (e) {
-                alert("Error: " + e.message);
+                console.error(e);
+                alert("Error procesando: " + e.message);
             } finally {
                 toggleLoader(false);
             }
@@ -329,6 +332,7 @@
             return raw;
         }
 
+        // --- FUNCIÓN BLINDADA CONTRA ERRORES DE API ---
         async function callGemini(text) {
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${API_KEY_GEMINI}`;
             const body = {
@@ -336,8 +340,21 @@
                 systemInstruction: { parts: [{ text: systemPrompt }] },
                 generationConfig: { responseMimeType: "application/json", responseSchema: jsonSchema }
             };
+            
             const r = await fetch(url, { method: 'POST', body: JSON.stringify(body), headers: {'Content-Type':'application/json'} });
+            
+            if (!r.ok) {
+                throw new Error(`API Error: ${r.status}`);
+            }
+            
             const j = await r.json();
+            
+            // Verificación extra para evitar el error "reading '0'"
+            if (!j.candidates || j.candidates.length === 0) {
+                console.error("Respuesta IA vacía:", j);
+                throw new Error("La IA no pudo interpretar el texto. Intenta ser más claro.");
+            }
+            
             return JSON.parse(j.candidates[0].content.parts[0].text);
         }
 
@@ -365,6 +382,12 @@
                             };
                             const r = await fetch(url, { method: 'POST', body: JSON.stringify(body), headers: {'Content-Type':'application/json'} });
                             const j = await r.json();
+                            
+                            // Misma protección aquí
+                            if (!j.candidates || j.candidates.length === 0) {
+                                throw new Error("La IA no pudo leer la imagen.");
+                            }
+
                             const parsed = JSON.parse(j.candidates[0].content.parts[0].text);
                             
                             const tecName = normalizeTec(parsed.tecnicatura);
@@ -389,7 +412,10 @@
                                 vendedor: ''
                             };
                             await addDoc(leadsRef, newDoc);
-                        } catch(e) { alert("Error imagen: " + e.message); }
+                        } catch(e) { 
+                            console.error(e);
+                            alert("Error imagen: " + e.message); 
+                        }
                         finally { toggleLoader(false); }
                     };
                     reader.readAsDataURL(blob);
@@ -414,7 +440,7 @@
                 <h1 class="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-300 to-blue-400">
                     Procesador de Leads
                 </h1>
-                <p class="text-blue-200 opacity-80 mt-1">Versión 8.1 • Historical Offset</p>
+                <p class="text-blue-200 opacity-80 mt-1">Versión 8.2 • Stable Fix</p>
             </div>
         </header>
 
