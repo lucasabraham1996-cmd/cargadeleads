@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Procesador de Leads v8.4 - Fix Observaciones</title>
+    <title>Procesador de Leads v8.5 - Robustez Total</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- SheetJS -->
@@ -43,7 +43,6 @@
         }
         .glass-input::placeholder { color: rgba(255, 255, 255, 0.5); }
         
-        /* Select con fondo oscuro para que se lean las opciones */
         select.glass-input option {
             background-color: #1e293b;
             color: white;
@@ -87,7 +86,6 @@
         }
         @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        /* Modal Overlay */
         .modal-overlay {
             background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(5px);
@@ -99,7 +97,7 @@
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, onSnapshot, updateDoc, deleteDoc, doc, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- CLAVES ORIGINALES ---
+        // --- TU CLAVE ORIGINAL ---
         const API_KEY_GEMINI = "AIzaSyClcQiTJj91vzb0P5737owh4tUyJPLWgEA"; 
         
         // --- CONSTANTES DE BASE HISTÓRICA ---
@@ -124,15 +122,15 @@
             'Estado', 'Vendedor Asignado', 'Fecha de Creación', 'Último Contacto', 'Observaciones'
         ];
 
-        // --- PROMPT REFINADO PARA IGNORAR BASURA DE CHAT ---
+        // --- PROMPT REFINADO ---
         const systemPrompt = `
             Analiza el texto provisto. Es probable que sea un "copiar y pegar" sucio de WhatsApp.
             Tu misión es limpiar el ruido y extraer la información real del lead.
 
             INSTRUCCIONES DE LIMPIEZA:
             1. IGNORA líneas de metadatos como: "[10:35 a.m., 2/12/2025]", "+54 9 ...:", nombres de remitentes repetidos en cabeceras.
-            2. Extrae el NOMBRE real de la persona (suele estar en el cuerpo o en la cabecera si es único).
-            3. Extrae el TELÉFONO. Si hay varios (uno en cabecera y otro en cuerpo), prefiere el del cuerpo. Límpialo: solo números, sin espacios, sin guiones.
+            2. Extrae el NOMBRE real de la persona.
+            3. Extrae el TELÉFONO. Límpialo: solo números.
             4. CARRERA: Busca explícitamente en el cuerpo del mensaje. Palabras clave:
                - "Analista", "Sistemas", "Computación" -> Analista de sistemas
                - "Web", "Programación" -> Desarrollo web
@@ -269,9 +267,11 @@
             try {
                 const parsed = await callGemini(txt);
                 
+                // Si callGemini devuelve null (error controlado), salimos
+                if (!parsed) return;
+
                 const tecName = normalizeTec(parsed.tecnicatura);
                 const tecId = tecnicaturaMap[tecName] || '';
-                // Por defecto, si viene de un chat sucio y no dice nada, asumimos WPP para que cuente
                 const pref = parsed.preferencia || 'whatsapp'; 
                 
                 let obsText = "Ingresa por WhatsApp Comercial - Consulta general.";
@@ -399,11 +399,14 @@
             if(s.includes('sist') || s.includes('analist')) return 'Analista de sistemas';
             if(s.includes('dat') || s.includes('ia')) return 'Ciencia de datos e IA';
             if(s.includes('rrhh') || s.includes('recurs')) return 'Recursos humanos';
-            return raw; // Retorna original si no matchea para editarlo luego
+            return raw; 
         }
 
+        // --- FUNCIÓN BLINDADA (Fix "reading 0" & 403) ---
         async function callGemini(text) {
+            // Usamos modelo 2.5 flash preview pero si falla, manejamos el error
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${API_KEY_GEMINI}`;
+            
             const body = {
                 contents: [{ parts: [{ text }] }],
                 systemInstruction: { parts: [{ text: systemPrompt }] },
@@ -411,10 +414,22 @@
             };
             
             const r = await fetch(url, { method: 'POST', body: JSON.stringify(body), headers: {'Content-Type':'application/json'} });
-            if (!r.ok) throw new Error(`API Error: ${r.status}`);
+            
+            if (!r.ok) {
+                if (r.status === 403) {
+                    alert("Error 403 (Permisos API): Tu clave puede haber expirado o tener cuota llena. Revisa tu cuenta de Google AI Studio.");
+                    return null;
+                }
+                throw new Error(`API Error: ${r.status}`);
+            }
             
             const j = await r.json();
-            if (!j.candidates || j.candidates.length === 0) throw new Error("No se pudo interpretar el texto.");
+            
+            // Verificación crítica para evitar el error "reading '0'"
+            if (!j.candidates || j.candidates.length === 0) {
+                console.error("Respuesta vacía:", j);
+                throw new Error("La IA no devolvió datos válidos. Intenta de nuevo.");
+            }
             
             return JSON.parse(j.candidates[0].content.parts[0].text);
         }
@@ -444,6 +459,9 @@
                             };
                             const r = await fetch(url, { method: 'POST', body: JSON.stringify(body), headers: {'Content-Type':'application/json'} });
                             const j = await r.json();
+                            
+                            if (!j.candidates || j.candidates.length === 0) throw new Error("Error leyendo imagen (Sin candidatos).");
+
                             const parsed = JSON.parse(j.candidates[0].content.parts[0].text);
                             
                             const tecName = normalizeTec(parsed.tecnicatura);
@@ -548,7 +566,7 @@
                 <h1 class="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-300 to-blue-400">
                     Procesador de Leads
                 </h1>
-                <p class="text-blue-200 opacity-80 mt-1">Versión 8.4 • Fix Observaciones</p>
+                <p class="text-blue-200 opacity-80 mt-1">Versión 8.5 • Robustez Total</p>
             </div>
         </header>
 
