@@ -3,642 +3,457 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Procesador de Leads v8.5 - Robustez Total</title>
-    <!-- Tailwind CSS -->
+    <title>LeadExtractor Pro - Versión Ligera</title>
+    
+    <!-- 1. Tailwind CSS (Diseño) -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- SheetJS -->
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <!-- Fuentes -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- 2. Excel (SheetJS) -->
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    
+    <!-- 3. OCR (Tesseract.js) -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+    <!-- Iconos (Feather Icons - Ligero) -->
+    <script src="https://unpkg.com/feather-icons"></script>
 
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #06b6d4 100%);
-            background-attachment: fixed;
-            color: #f1f5f9;
-            min-height: 100vh;
-        }
-
-        .glass-panel {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
-            border-radius: 16px;
-        }
-
-        .glass-input {
-            background: rgba(0, 0, 0, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: white;
-            transition: all 0.3s ease;
-        }
-        .glass-input:focus {
-            background: rgba(0, 0, 0, 0.4);
-            border-color: #22d3ee;
-            outline: none;
-            box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.3);
-        }
-        .glass-input::placeholder { color: rgba(255, 255, 255, 0.5); }
-        
-        select.glass-input option {
-            background-color: #1e293b;
-            color: white;
-        }
-
-        .btn-action {
-            background: linear-gradient(90deg, #0891b2 0%, #2563eb 100%);
-            border: 1px solid rgba(255,255,255,0.2);
-            color: white;
-            font-weight: 600;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        .btn-action:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(6, 182, 212, 0.4);
-        }
-        .btn-action:disabled { opacity: 0.5; cursor: not-allowed; }
-
-        .btn-danger { background: linear-gradient(90deg, #be123c 0%, #e11d48 100%); }
-        .btn-success { background: linear-gradient(90deg, #059669 0%, #10b981 100%); }
-        .btn-secondary { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255,255,255,0.2); }
-
-        .glass-table th {
-            background: rgba(0, 0, 0, 0.3);
-            color: #22d3ee;
-            text-transform: uppercase;
-            font-size: 0.75rem;
-            letter-spacing: 0.05em;
-        }
-        .glass-table tr {
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            transition: background 0.2s;
-        }
-        .glass-table tr:hover { background: rgba(255, 255, 255, 0.05); }
-        .glass-table td { color: #e2e8f0; font-size: 0.9rem; }
-
-        .loader {
-            border-top-color: #22d3ee;
-            -webkit-animation: spinner 1.5s linear infinite;
-            animation: spinner 1.5s linear infinite;
-        }
-        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        .modal-overlay {
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(5px);
-        }
+        body { background-color: #f0f2f5; font-family: -apple-system, system-ui, sans-serif; }
+        .loader { border: 3px solid #f3f3f3; border-top: 3px solid #22c55e; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; display: inline-block; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        /* Animación suave */
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
-
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, query, onSnapshot, updateDoc, deleteDoc, doc, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // --- TU CLAVE ORIGINAL ---
-        const API_KEY_GEMINI = "AIzaSyClcQiTJj91vzb0P5737owh4tUyJPLWgEA"; 
-        
-        // --- CONSTANTES DE BASE HISTÓRICA ---
-        const HISTORICAL_TOTAL = 43;
-        const HISTORICAL_WPP = 32;
-        const HISTORICAL_CALL = 0;
-
-        const tecnicaturaMap = {
-            'Desarrollo web': 1,
-            'Administración de empresas': 2,
-            'Marketing': 3,
-            'Higiene y seguridad': 4,
-            'Gestión inmobiliaria': 5,
-            'Analista de sistemas': 6,
-            'Ciencia de datos e IA': 7,
-            'Recursos humanos': 8
-        };
-        const tecnicaturaNameMap = Object.fromEntries(Object.entries(tecnicaturaMap).map(([key, value]) => [value, key]));
-
-        const excelHeaders = [
-            'ID', 'Nombre Completo', 'Email', 'Teléfono', 'Tecnicatura', 
-            'Estado', 'Vendedor Asignado', 'Fecha de Creación', 'Último Contacto', 'Observaciones'
-        ];
-
-        // --- PROMPT REFINADO ---
-        const systemPrompt = `
-            Analiza el texto provisto. Es probable que sea un "copiar y pegar" sucio de WhatsApp.
-            Tu misión es limpiar el ruido y extraer la información real del lead.
-
-            INSTRUCCIONES DE LIMPIEZA:
-            1. IGNORA líneas de metadatos como: "[10:35 a.m., 2/12/2025]", "+54 9 ...:", nombres de remitentes repetidos en cabeceras.
-            2. Extrae el NOMBRE real de la persona.
-            3. Extrae el TELÉFONO. Límpialo: solo números.
-            4. CARRERA: Busca explícitamente en el cuerpo del mensaje. Palabras clave:
-               - "Analista", "Sistemas", "Computación" -> Analista de sistemas
-               - "Web", "Programación" -> Desarrollo web
-               - "Adm", "Empresas", "Negocios" -> Administración de empresas
-               - "Marketing", "Comercialización" -> Marketing
-               - "Higiene", "Seguridad" -> Higiene y seguridad
-               - "Inmobiliaria", "Martillero" -> Gestión inmobiliaria
-               - "Datos", "Data", "IA" -> Ciencia de datos e IA
-               - "RRHH", "Recursos" -> Recursos humanos
-            
-            5. PREFERENCIA:
-               - "telefono": Si dice explícitamente llamar, celular, voz.
-               - "whatsapp": Si dice escribir, mensaje, o por defecto si es un chat y no pide llamada.
-
-            JSON SALIDA: { "nombre": str, "email": str, "telefono": str, "tecnicatura": str, "preferencia": "whatsapp"|"telefono"|null }
-        `;
-
-        const jsonSchema = {
-            type: "OBJECT",
-            properties: {
-                "nombre": { "type": "STRING" },
-                "email": { "type": "STRING" },
-                "telefono": { "type": "STRING" },
-                "tecnicatura": { "type": "STRING" },
-                "preferencia": { "type": "STRING", "enum": ["whatsapp", "telefono"], "nullable": true }
-            }
-        };
-
-        let db, auth, leadsRef;
-        let allLeads = [];
-        let activeLeads = [];
-        let currentEditId = null;
-
-        async function initApp() {
-            try {
-                const firebaseConfig = {
-                    apiKey: API_KEY_GEMINI,
-                    authDomain: "cargadeleads.firebaseapp.com",
-                    projectId: "cargadeleads",
-                    storageBucket: "cargadeleads.firebasestorage.app",
-                    messagingSenderId: "744616190679",
-                    appId: "1:744616190679:web:af63cbf7b42ee455a30692"
-                };
-
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-                
-                await signInAnonymously(auth);
-                leadsRef = collection(db, 'leads'); 
-                
-                listenLeads();
-            } catch (e) {
-                alert("Error crítico de conexión: " + e.message);
-            }
-        }
-
-        function listenLeads() {
-            const q = query(leadsRef);
-            onSnapshot(q, (snap) => {
-                allLeads = [];
-                snap.forEach(d => allLeads.push({ id: d.id, ...d.data() }));
-                allLeads.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-                renderUI();
-            });
-        }
-
-        function renderUI() {
-            activeLeads = allLeads.filter(l => !l.archivado);
-
-            // Contadores
-            const currentTotal = allLeads.length;
-            const currentWpp = allLeads.filter(l => l.preferencia === 'whatsapp').length;
-            const currentCall = allLeads.filter(l => l.preferencia === 'telefono').length;
-
-            const totalFinal = HISTORICAL_TOTAL + currentTotal;
-            const wppFinal = HISTORICAL_WPP + currentWpp;
-            const callFinal = HISTORICAL_CALL + currentCall;
-
-            const wppPct = totalFinal > 0 ? Math.round((wppFinal / totalFinal) * 100) : 0;
-            const callPct = totalFinal > 0 ? Math.round((callFinal / totalFinal) * 100) : 0;
-
-            document.getElementById('countTotal').textContent = totalFinal;
-            document.getElementById('countWpp').textContent = `${wppPct}% (${wppFinal})`;
-            document.getElementById('countCall').textContent = `${callPct}% (${callFinal})`;
-
-            // Tabla
-            const tbody = document.getElementById('tableBody');
-            tbody.innerHTML = '';
-            
-            if(activeLeads.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10" class="p-4 text-center text-gray-400">Bandeja de entrada limpia.</td></tr>';
-            } else {
-                activeLeads.forEach(lead => {
-                    const row = document.createElement('tr');
-                    const tecName = lead.tecnicaturaNombre || '-';
-                    
-                    let prefIcon = '';
-                    if(lead.preferencia === 'whatsapp') prefIcon = '<span class="text-green-400 font-bold">WPP</span>';
-                    if(lead.preferencia === 'telefono') prefIcon = '<span class="text-blue-400 font-bold">TEL</span>';
-
-                    row.innerHTML = `
-                        <td class="p-3 text-xs font-mono text-gray-400">${lead.id.substring(0,4)}</td>
-                        <td class="p-3 font-medium">${lead.nombre}</td>
-                        <td class="p-3 text-xs">${lead.email}</td>
-                        <td class="p-3 text-xs">${lead.telefono}</td>
-                        <td class="p-3 text-xs text-cyan-300">${tecName}</td>
-                        <td class="p-3 text-xs">${prefIcon}</td>
-                        <td class="p-3 text-xs">${lead.fecha}</td>
-                        <td class="p-3 text-xs italic opacity-70 truncate max-w-[150px]">${lead.observacion}</td>
-                        <td class="p-3 text-center flex justify-center gap-2">
-                            <button onclick="window.editarLead('${lead.id}')" class="text-blue-400 hover:text-blue-200" title="Editar">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                            </button>
-                            <button onclick="window.archivarLead('${lead.id}')" class="text-red-400 hover:text-red-200" title="Archivar">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
-                            </button>
-                        </td>
-                    `;
-                    tbody.appendChild(row);
-                });
-            }
-            
-            document.getElementById('btnDownload').disabled = activeLeads.length === 0;
-            document.getElementById('btnClean').disabled = activeLeads.length === 0;
-        }
-
-        window.procesar = async () => {
-            const input = document.getElementById('inputMsg');
-            const txt = input.value;
-            if(!txt.trim()) return alert("Escribe algo.");
-            
-            toggleLoader(true);
-            try {
-                const parsed = await callGemini(txt);
-                
-                // Si callGemini devuelve null (error controlado), salimos
-                if (!parsed) return;
-
-                const tecName = normalizeTec(parsed.tecnicatura);
-                const tecId = tecnicaturaMap[tecName] || '';
-                const pref = parsed.preferencia || 'whatsapp'; 
-                
-                let obsText = "Ingresa por WhatsApp Comercial - Consulta general.";
-                if (pref === 'whatsapp') obsText = "Ingresa por WhatsApp Comercial - Manifiesta que la contacten por WhatsApp.";
-                if (pref === 'telefono') obsText = "Ingresa por WhatsApp Comercial - Manifiesta que prefiere por esa vía (Llamada).";
-
-                const newDoc = {
-                    nombre: parsed.nombre || 'Desconocido',
-                    email: parsed.email || '',
-                    telefono: parsed.telefono || '',
-                    tecnicaturaNombre: tecName,
-                    tecnicaturaId: tecId,
-                    preferencia: pref,
-                    observacion: obsText,
-                    fecha: new Date().toLocaleDateString('es-AR'),
-                    timestamp: Date.now(),
-                    archivado: false,
-                    estado: 'Nuevo',
-                    vendedor: ''
-                };
-
-                await addDoc(leadsRef, newDoc);
-                input.value = '';
-                
-            } catch (e) {
-                console.error(e);
-                alert("Error procesando: " + e.message);
-            } finally {
-                toggleLoader(false);
-            }
-        };
-
-        // --- EDICIÓN ---
-        window.editarLead = (id) => {
-            const lead = allLeads.find(l => l.id === id);
-            if(!lead) return;
-            currentEditId = id;
-            
-            document.getElementById('editNombre').value = lead.nombre;
-            document.getElementById('editEmail').value = lead.email;
-            document.getElementById('editTelefono').value = lead.telefono;
-            document.getElementById('editTecnicatura').value = lead.tecnicaturaNombre;
-            document.getElementById('editPreferencia').value = lead.preferencia || "";
-            document.getElementById('editObservacion').value = lead.observacion;
-            
-            document.getElementById('editModal').classList.remove('hidden');
-            document.getElementById('editModal').classList.add('flex');
-        };
-
-        window.guardarEdicion = async () => {
-            if(!currentEditId) return;
-            
-            const tecName = document.getElementById('editTecnicatura').value;
-            const tecId = tecnicaturaMap[tecName] || '';
-            const pref = document.getElementById('editPreferencia').value;
-            
-            const updatedData = {
-                nombre: document.getElementById('editNombre').value,
-                email: document.getElementById('editEmail').value,
-                telefono: document.getElementById('editTelefono').value,
-                tecnicaturaNombre: tecName,
-                tecnicaturaId: tecId,
-                preferencia: pref,
-                observacion: document.getElementById('editObservacion').value
-            };
-            
-            toggleLoader(true);
-            try {
-                await updateDoc(doc(db, 'leads', currentEditId), updatedData);
-                cerrarModal();
-            } catch(e) {
-                alert("Error al guardar: " + e.message);
-            } finally {
-                toggleLoader(false);
-            }
-        };
-
-        window.cerrarModal = () => {
-            document.getElementById('editModal').classList.add('hidden');
-            document.getElementById('editModal').classList.remove('flex');
-            currentEditId = null;
-        };
-
-        window.archivarLead = async (id) => {
-            if(!confirm("¿Archivar?")) return;
-            await updateDoc(doc(db, 'leads', id), { archivado: true });
-        };
-
-        window.limpiarPantalla = async () => {
-            if(!confirm("Archivar TODO lo visible?")) return;
-            const batch = writeBatch(db);
-            activeLeads.forEach(l => {
-                batch.update(doc(db, 'leads', l.id), { archivado: true });
-            });
-            await batch.commit();
-        };
-
-        window.descargarExcel = () => {
-            const data = activeLeads.map(l => ({
-                'ID': l.id.substring(0,5),
-                'Nombre Completo': l.nombre,
-                'Email': l.email,
-                'Teléfono': l.telefono,
-                'Tecnicatura': l.tecnicaturaId,
-                'Estado': l.estado,
-                'Vendedor Asignado': l.vendedor,
-                'Fecha de Creación': l.fecha,
-                'Último Contacto': '',
-                'Observaciones': l.observacion
-            }));
-            const ws = XLSX.utils.json_to_sheet(data);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Leads");
-            XLSX.writeFile(wb, "Leads_Cervantes.xlsx");
-        };
-
-        function normalizeTec(raw) {
-            if(!raw) return '';
-            const s = raw.toLowerCase();
-            if(s.includes('web') || s.includes('prog')) return 'Desarrollo web';
-            if(s.includes('adm') || s.includes('empresa')) return 'Administración de empresas';
-            if(s.includes('mkt') || s.includes('market')) return 'Marketing';
-            if(s.includes('hig') || s.includes('segur')) return 'Higiene y seguridad';
-            if(s.includes('inmob') || s.includes('marti')) return 'Gestión inmobiliaria';
-            if(s.includes('sist') || s.includes('analist')) return 'Analista de sistemas';
-            if(s.includes('dat') || s.includes('ia')) return 'Ciencia de datos e IA';
-            if(s.includes('rrhh') || s.includes('recurs')) return 'Recursos humanos';
-            return raw; 
-        }
-
-        // --- FUNCIÓN BLINDADA (Fix "reading 0" & 403) ---
-        async function callGemini(text) {
-            // Usamos modelo 2.5 flash preview pero si falla, manejamos el error
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${API_KEY_GEMINI}`;
-            
-            const body = {
-                contents: [{ parts: [{ text }] }],
-                systemInstruction: { parts: [{ text: systemPrompt }] },
-                generationConfig: { responseMimeType: "application/json", responseSchema: jsonSchema }
-            };
-            
-            const r = await fetch(url, { method: 'POST', body: JSON.stringify(body), headers: {'Content-Type':'application/json'} });
-            
-            if (!r.ok) {
-                if (r.status === 403) {
-                    alert("Error 403 (Permisos API): Tu clave puede haber expirado o tener cuota llena. Revisa tu cuenta de Google AI Studio.");
-                    return null;
-                }
-                throw new Error(`API Error: ${r.status}`);
-            }
-            
-            const j = await r.json();
-            
-            // Verificación crítica para evitar el error "reading '0'"
-            if (!j.candidates || j.candidates.length === 0) {
-                console.error("Respuesta vacía:", j);
-                throw new Error("La IA no devolvió datos válidos. Intenta de nuevo.");
-            }
-            
-            return JSON.parse(j.candidates[0].content.parts[0].text);
-        }
-
-        function toggleLoader(show) {
-            document.getElementById('loaderOverlay').style.display = show ? 'flex' : 'none';
-        }
-
-        document.addEventListener('DOMContentLoaded', initApp);
-        
-        // Paste Handler
-        document.addEventListener('paste', (e) => {
-            const items = e.clipboardData.items;
-            for (let i = 0; i < items.length; i++) {
-                if (items[i].type.indexOf("image") !== -1) {
-                    const blob = items[i].getAsFile();
-                    const reader = new FileReader();
-                    reader.onload = async (event) => {
-                        toggleLoader(true);
-                        const base64 = event.target.result.split(',')[1];
-                        try {
-                            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${API_KEY_GEMINI}`;
-                            const body = {
-                                contents: [{ parts: [{text: "Extrae JSON limpio"}, {inlineData: {mimeType: blob.type, data: base64}}] }],
-                                systemInstruction: { parts: [{ text: systemPrompt }] },
-                                generationConfig: { responseMimeType: "application/json", responseSchema: jsonSchema }
-                            };
-                            const r = await fetch(url, { method: 'POST', body: JSON.stringify(body), headers: {'Content-Type':'application/json'} });
-                            const j = await r.json();
-                            
-                            if (!j.candidates || j.candidates.length === 0) throw new Error("Error leyendo imagen (Sin candidatos).");
-
-                            const parsed = JSON.parse(j.candidates[0].content.parts[0].text);
-                            
-                            const tecName = normalizeTec(parsed.tecnicatura);
-                            const tecId = tecnicaturaMap[tecName] || '';
-                            const pref = parsed.preferencia || 'whatsapp';
-                            
-                            let obsText = "Ingresa por WhatsApp Comercial - Consulta general.";
-                            if (pref === 'whatsapp') obsText = "Ingresa por WhatsApp Comercial - Manifiesta que la contacten por WhatsApp.";
-                            if (pref === 'telefono') obsText = "Ingresa por WhatsApp Comercial - Manifiesta que prefiere por esa vía (Llamada).";
-
-                            const newDoc = {
-                                nombre: parsed.nombre || 'Desconocido',
-                                email: parsed.email || '',
-                                telefono: parsed.telefono || '',
-                                tecnicaturaNombre: tecName,
-                                tecnicaturaId: tecId,
-                                preferencia: pref,
-                                observacion: obsText,
-                                fecha: new Date().toLocaleDateString('es-AR'),
-                                timestamp: Date.now(),
-                                archivado: false,
-                                estado: 'Nuevo',
-                                vendedor: ''
-                            };
-                            await addDoc(leadsRef, newDoc);
-                        } catch(e) { console.error(e); alert("Error imagen: " + e.message); }
-                        finally { toggleLoader(false); }
-                    };
-                    reader.readAsDataURL(blob);
-                }
-            }
-        });
-    </script>
 </head>
-<body class="p-6">
+<body class="text-slate-800">
 
-    <!-- Loader -->
-    <div id="loaderOverlay" class="fixed inset-0 bg-black/80 z-50 hidden flex-col items-center justify-center backdrop-blur-sm">
-        <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-16 w-16 mb-4"></div>
-        <h2 class="text-cyan-400 font-bold text-xl animate-pulse">Procesando Lead...</h2>
+    <!-- Notificación Toast -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-slate-800 text-white px-6 py-3 rounded-xl shadow-2xl transform translate-y-20 transition-transform duration-300 z-50 flex items-center gap-3 font-medium text-sm">
+        <span id="toast-icon"></span>
+        <span id="toast-message">Mensaje</span>
     </div>
 
-    <!-- Edit Modal -->
-    <div id="editModal" class="fixed inset-0 z-50 hidden items-center justify-center modal-overlay p-4">
-        <div class="glass-panel p-6 w-full max-w-lg bg-slate-900/90 border border-white/20 relative">
-            <button onclick="window.cerrarModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white">✕</button>
-            <h3 class="text-xl font-bold text-cyan-400 mb-4">Editar Lead</h3>
-            <div class="space-y-3">
-                <div>
-                    <label class="text-xs uppercase text-gray-400">Nombre</label>
-                    <input type="text" id="editNombre" class="glass-input w-full p-2 rounded">
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="text-xs uppercase text-gray-400">Email</label>
-                        <input type="text" id="editEmail" class="glass-input w-full p-2 rounded">
-                    </div>
-                    <div>
-                        <label class="text-xs uppercase text-gray-400">Teléfono</label>
-                        <input type="text" id="editTelefono" class="glass-input w-full p-2 rounded">
-                    </div>
-                </div>
-                <div>
-                    <label class="text-xs uppercase text-gray-400">Carrera (Tecnicatura)</label>
-                    <select id="editTecnicatura" class="glass-input w-full p-2 rounded">
-                        <option value="">- Seleccionar -</option>
-                        <option value="Desarrollo web">Desarrollo web</option>
-                        <option value="Administración de empresas">Administración de empresas</option>
-                        <option value="Marketing">Marketing</option>
-                        <option value="Higiene y seguridad">Higiene y seguridad</option>
-                        <option value="Gestión inmobiliaria">Gestión inmobiliaria</option>
-                        <option value="Analista de sistemas">Analista de sistemas</option>
-                        <option value="Ciencia de datos e IA">Ciencia de datos e IA</option>
-                        <option value="Recursos humanos">Recursos humanos</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="text-xs uppercase text-gray-400">Preferencia</label>
-                    <select id="editPreferencia" class="glass-input w-full p-2 rounded">
-                        <option value="">- Ninguna -</option>
-                        <option value="whatsapp">WhatsApp</option>
-                        <option value="telefono">Teléfono</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="text-xs uppercase text-gray-400">Observaciones</label>
-                    <textarea id="editObservacion" class="glass-input w-full p-2 rounded h-20"></textarea>
-                </div>
-                <div class="flex justify-end gap-2 mt-4">
-                    <button onclick="window.cerrarModal()" class="btn-secondary px-4 py-2 rounded text-sm">Cancelar</button>
-                    <button onclick="window.guardarEdicion()" class="btn-success px-4 py-2 rounded text-sm">Guardar Cambios</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="max-w-7xl mx-auto space-y-6">
+    <!-- Contenedor Principal -->
+    <div class="max-w-7xl mx-auto p-4 md:p-6 min-h-screen flex flex-col gap-6">
         
         <!-- Header -->
-        <header class="flex justify-between items-end pb-4 border-b border-white/10">
-            <div>
-                <h1 class="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-300 to-blue-400">
-                    Procesador de Leads
-                </h1>
-                <p class="text-blue-200 opacity-80 mt-1">Versión 8.5 • Robustez Total</p>
+        <header class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-green-500 p-2 rounded-xl text-white shadow">
+                    <i data-feather="clipboard" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight text-slate-800">LeadExtractor Pro</h1>
+                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">HTML Nativo • Sin React</p>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="copySummary()" class="bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition-colors">
+                    <i data-feather="copy" class="w-4 h-4"></i> Copiar Todo
+                </button>
+                <button onclick="exportToExcel()" class="bg-slate-800 hover:bg-black text-white px-5 py-2 rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg transition-transform active:scale-95">
+                    <i data-feather="download" class="w-4 h-4"></i> Excel
+                </button>
             </div>
         </header>
 
-        <!-- Stats Panel -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div class="glass-panel p-6 flex flex-col items-center justify-center">
-                <span class="text-blue-300 text-sm font-bold uppercase tracking-widest">Total Procesados (Histórico)</span>
-                <span id="countTotal" class="text-5xl font-bold text-white mt-2 drop-shadow-lg">43</span>
-            </div>
-            <div class="glass-panel p-6 flex flex-col items-center justify-center border-l-4 border-green-400">
-                <span class="text-green-300 text-sm font-bold uppercase tracking-widest">WhatsApp</span>
-                <span id="countWpp" class="text-5xl font-bold text-green-400 mt-2 drop-shadow-lg">74% (32)</span>
-            </div>
-            <div class="glass-panel p-6 flex flex-col items-center justify-center border-l-4 border-blue-400">
-                <span class="text-blue-300 text-sm font-bold uppercase tracking-widest">Llamados</span>
-                <span id="countCall" class="text-5xl font-bold text-blue-400 mt-2 drop-shadow-lg">0% (0)</span>
-            </div>
-        </div>
-
-        <!-- Main Area -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[600px]">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
-            <!-- Input Area -->
-            <div class="glass-panel p-6 flex flex-col gap-4">
-                <h2 class="text-xl font-bold text-cyan-100 flex items-center gap-2">
-                    <span>📥</span> Ingreso de Datos
-                </h2>
-                <textarea id="inputMsg" class="glass-input w-full flex-grow rounded-xl p-4 resize-none text-sm leading-relaxed" 
-                    placeholder="Pega aquí el mensaje de WhatsApp, correo o presiona CTRL+V para pegar una imagen..."></textarea>
-                <button onclick="procesar()" class="btn-action py-3 rounded-xl shadow-lg text-lg flex items-center justify-center gap-2">
-                    <span>✨</span> Procesar con IA
-                </button>
-            </div>
+            <!-- Panel Izquierdo: Captura -->
+            <section class="lg:col-span-4 flex flex-col gap-4">
+                <div id="drop-zone" class="bg-white p-6 rounded-3xl shadow-lg border-2 border-white transition-all duration-300">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                            <span id="status-icon"><i data-feather="image" class="w-4 h-4 text-blue-500"></i></span>
+                            <span id="status-text">Área de Captura</span>
+                        </h3>
+                    </div>
 
-            <!-- Table Area -->
-            <div class="glass-panel p-6 lg:col-span-2 flex flex-col">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold text-cyan-100">Bandeja de Entrada (Activos)</h2>
-                    <div class="flex gap-2">
-                        <button id="btnClean" onclick="limpiarPantalla()" disabled class="btn-danger px-4 py-2 rounded-lg text-sm shadow-lg font-bold">
-                            🧹 Limpiar Pantalla (Archivar)
-                        </button>
-                        <button id="btnDownload" onclick="descargarExcel()" disabled class="btn-success px-4 py-2 rounded-lg text-sm shadow-lg font-bold flex items-center gap-2">
-                            <span>📊</span> Descargar Excel
-                        </button>
+                    <!-- Área Interactiva -->
+                    <div class="relative w-full h-48 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 hover:border-green-400 transition-colors cursor-pointer overflow-hidden group">
+                        <textarea id="paste-input" class="absolute inset-0 w-full h-full p-6 bg-transparent resize-none text-xs focus:outline-none z-10 text-center flex items-center justify-center placeholder:text-transparent text-slate-600 font-medium" placeholder="Pega aquí..."></textarea>
+                        
+                        <!-- Placeholder Visual -->
+                        <div id="paste-placeholder" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none transition-opacity duration-200">
+                            <div class="bg-white p-3 rounded-full shadow-sm mb-2 group-hover:scale-110 transition-transform">
+                                <i data-feather="zap" class="w-6 h-6 text-slate-300 group-hover:text-green-500"></i>
+                            </div>
+                            <p class="text-xs font-bold text-slate-500">Haz Clic y CTRL+V</p>
+                            <span class="text-[10px] text-slate-400 font-medium mt-1">Imagen o Texto</span>
+                        </div>
                     </div>
                 </div>
-                
-                <div class="overflow-auto flex-grow rounded-lg border border-white/10">
-                    <table class="w-full glass-table text-left border-collapse">
-                        <thead class="sticky top-0 z-10 backdrop-blur-md">
-                            <tr>
-                                <th class="p-3">ID</th>
-                                <th class="p-3">Nombre</th>
-                                <th class="p-3">Email</th>
-                                <th class="p-3">Tel</th>
-                                <th class="p-3">Tec</th>
-                                <th class="p-3">Pref</th>
-                                <th class="p-3">Fecha</th>
-                                <th class="p-3">Obs</th>
-                                <th class="p-3 text-center">Acción</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tableBody">
-                            <!-- JS Injected -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
 
+                <!-- Referencia de Colores -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+                    <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Referencias</h4>
+                    <div class="grid grid-cols-2 gap-2" id="legend-container">
+                        <!-- Se llena con JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Panel Derecho: Tabla -->
+            <section class="lg:col-span-8">
+                <div class="bg-white rounded-3xl shadow-lg border border-slate-100 overflow-hidden min-h-[500px] flex flex-col">
+                    <div class="p-5 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+                        <span class="font-bold text-xs uppercase text-slate-500 tracking-wider">Registros: <span id="row-count">0</span></span>
+                        <button onclick="addManualRow()" class="text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide flex items-center gap-1 transition-colors">
+                            <i data-feather="plus" class="w-3 h-3"></i> Manual
+                        </button>
+                    </div>
+                    
+                    <div class="overflow-x-auto flex-1">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-slate-50 text-slate-400 uppercase text-[9px] font-black tracking-widest sticky top-0 z-10">
+                                <tr>
+                                    <th class="px-6 py-4">Datos del Prospecto</th>
+                                    <th class="px-6 py-4">Contacto</th>
+                                    <th class="px-6 py-4">Carrera</th>
+                                    <th class="px-4 py-4 text-right"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-body" class="divide-y divide-slate-50">
+                                <!-- Filas generadas por JS -->
+                            </tbody>
+                        </table>
+                        
+                        <!-- Estado Vacío -->
+                        <div id="empty-state" class="flex flex-col items-center justify-center py-20 text-slate-300">
+                            <i data-feather="inbox" class="w-12 h-12 mb-3 opacity-50"></i>
+                            <p class="font-medium text-sm italic">Esperando datos...</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
     </div>
 
+    <!-- LÓGICA DE LA APLICACIÓN (Vanilla JS) -->
+    <script>
+        // --- Configuración y Datos ---
+        const CareerMapper = {
+            1: { label: 'Desarrollo web', color: '#b8a68e', keywords: ['desarrollo de web', 'desarrollo web', 'programacion', 'full stack', 'backend', 'frontend', 'dw', 'software', 'codigo'] },
+            2: { label: 'Administración de empresas', color: '#859f4f', keywords: ['administracion', 'administración', 'admin', 'empresas', 'ae', 'negocios', 'gestion', 'contable'] },
+            3: { label: 'Marketing', color: '#ff7b1c', keywords: ['marketing', 'mercadeo', 'publicidad', 'mkt', 'redes', 'community', 'digital'] },
+            4: { label: 'Higiene y seguridad', color: '#fbc42b', keywords: ['higiene', 'seguridad', 'prevencion', 'prevención', 'hys', 'riesgos'] },
+            5: { label: 'Gestión inmobiliaria', color: '#be2528', keywords: ['gestion inmobiliaria', 'tasacion', 'tasación', 'cotizacion', 'inmobiliaria', 'legales', 'negociacion', 'gi', 'martillero', 'corredor'] },
+            6: { label: 'Analista de sistemas', color: '#00adef', keywords: ['analista', 'sistemas', 'asc', 'informatica', 'computacion'] },
+            7: { label: 'Ciencia de datos e IA', color: '#405ba8', keywords: ['inteligencia artificial', 'ia', 'datos', 'data', 'science', 'machine learning'] },
+            8: { label: 'Recursos humanos', color: '#c397c6', keywords: ['recursos humanos', 'rrhh', 'personal', 'talento', 'rh', 'seleccion'] }
+        };
+
+        let rows = [];
+        let isProcessing = false;
+
+        // --- Inicialización ---
+        document.addEventListener('DOMContentLoaded', () => {
+            feather.replace();
+            renderLegend();
+            setupPasteListener();
+        });
+
+        // --- Lógica de Parsing Inteligente ---
+        function parseTextToData(text) {
+            const lowerText = text.toLowerCase();
+            const normalizedText = lowerText.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+            // 1. Email
+            const emailMatch = text.match(/[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}/g);
+            const email = emailMatch ? emailMatch[0] : '';
+
+            // 2. Teléfono (Prioridad WA)
+            let validPhone = '';
+            const phones = text.match(/(\+?\d{1,3}[\s-]?9?[\s-]?\d{1,4}[\s-]?\d{2,4}[\s-]?\d{2,6})/g);
+            if (phones) {
+                const cleaned = phones.map(p => ({ org: p, val: p.replace(/\D/g, '') }));
+                // Priorizar +54 o el más largo
+                const best = cleaned.find(p => p.val.startsWith('54')) || cleaned.sort((a,b) => b.val.length - a.val.length)[0];
+                validPhone = best ? best.org : '';
+            }
+
+            // 3. Carrera (Sistema de Puntos)
+            let bestId = '', maxScore = 0;
+            for (const [id, data] of Object.entries(CareerMapper)) {
+                let score = 0;
+                data.keywords.forEach(k => {
+                    const normK = k.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                    if (normalizedText.includes(normK)) score += k.length > 3 ? 2 : 1; 
+                });
+                if (score > maxScore) { maxScore = score; bestId = id; }
+            }
+
+            // 4. Nombre
+            const blackList = ['hola','interesa','quiero','info','precio','mensaje','cifrados','ayer','hoy','anuncio','facebook','cervantes','clic','error','foto','escribiendo','linea','bloquear','seguridad','contacto','perfil','cuenta','business', 'vez'];
+            
+            // Eliminar email y teléfono para no confundir
+            let clean = text.replace(email, '').replace(validPhone, '');
+            const lines = clean.split(/[\n]/).map(l => l.trim()).filter(l => l.length > 2);
+            
+            let likelyName = 'SIN NOMBRE';
+            // Buscar en las primeras 6 líneas
+            const candidate = lines.slice(0, 6).find(l => {
+                const low = l.toLowerCase();
+                const hasDigit = /\d/.test(l);
+                const isBlacklisted = blackList.some(b => low.includes(b));
+                const words = l.split(' ').length;
+                return !hasDigit && !isBlacklisted && words <= 4 && !l.includes(':');
+            });
+
+            if (candidate) {
+                const n = candidate.replace(/[^a-zA-Z\s\u00C0-\u00FF]/g, '').trim().toUpperCase();
+                if (n.length > 2) likelyName = n;
+            }
+
+            return {
+                id: Date.now(),
+                nombre: likelyName,
+                telefono: validPhone.trim(),
+                email: email,
+                tecnicaturaId: bestId,
+                fuente: 'WhatsApp Comercial',
+                provincia: '',
+                estado: 'sin_contacto',
+                observaciones: '',
+                vendedorId: ''
+            };
+        }
+
+        // --- Procesamiento de Pegado y OCR ---
+        function setupPasteListener() {
+            const input = document.getElementById('paste-input');
+            const dropZone = document.getElementById('drop-zone');
+
+            // Click para enfocar
+            dropZone.addEventListener('click', () => input.focus());
+
+            input.addEventListener('paste', async (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+
+                const items = e.clipboardData.items;
+                let imageFound = false;
+
+                // Buscar imagen
+                for (let i = 0; i < items.length; i++) {
+                    if (items[i].type.indexOf('image') !== -1) {
+                        const blob = items[i].getAsFile();
+                        processImage(blob);
+                        imageFound = true;
+                        break;
+                    }
+                }
+
+                // Si no es imagen, es texto
+                if (!imageFound) {
+                    const text = e.clipboardData.getData('text');
+                    if (text) {
+                        const data = parseTextToData(text);
+                        addRow(data);
+                        showToast('Texto procesado', 'check');
+                    }
+                }
+                
+                // Limpiar input visualmente
+                input.value = ''; 
+            });
+        }
+
+        async function processImage(blob) {
+            setLoading(true);
+            showToast('Analizando imagen...', 'loader');
+            
+            try {
+                if (!window.Tesseract) throw new Error("OCR no cargado");
+                
+                // Configuración segura para evitar errores de URL
+                const result = await Tesseract.recognize(blob, 'spa', {
+                    logger: m => console.log(m)
+                });
+                
+                const data = parseTextToData(result.data.text);
+                addRow(data);
+                showToast('Lead capturado', 'check');
+            } catch (err) {
+                console.error(err);
+                showToast('Error al leer imagen', 'alert-triangle');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // --- Gestión de la UI ---
+        function addRow(data) {
+            rows.push(data);
+            renderTable();
+        }
+
+        function addManualRow() {
+            const emptyData = { ...parseTextToData(''), nombre: 'SIN NOMBRE', id: Date.now() };
+            addRow(emptyData);
+        }
+
+        function updateRow(id, field, value) {
+            const row = rows.find(r => r.id === id);
+            if (row) {
+                row[field] = value;
+                // Re-renderizar si cambia la carrera para actualizar colores
+                if (field === 'tecnicaturaId') renderTable(); 
+            }
+        }
+
+        function deleteRow(id) {
+            rows = rows.filter(r => r.id !== id);
+            renderTable();
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('table-body');
+            const emptyState = document.getElementById('empty-state');
+            const countSpan = document.getElementById('row-count');
+            
+            tbody.innerHTML = '';
+            countSpan.textContent = rows.length;
+
+            if (rows.length === 0) {
+                emptyState.style.display = 'flex';
+                return;
+            }
+            emptyState.style.display = 'none';
+
+            rows.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = 'group hover:bg-slate-50 transition-colors fade-in';
+                
+                const careerColor = CareerMapper[row.tecnicaturaId]?.color || '#cbd5e1';
+                const careerLabel = CareerMapper[row.tecnicaturaId]?.label || '';
+
+                // Construcción de opciones del select
+                let optionsHtml = '<option value="">-- Detectar --</option>';
+                for (const [id, data] of Object.entries(CareerMapper)) {
+                    const selected = row.tecnicaturaId == id ? 'selected' : '';
+                    optionsHtml += `<option value="${id}" ${selected}>${data.label}</option>`;
+                }
+
+                tr.innerHTML = `
+                    <td class="px-6 py-4">
+                        <input onchange="updateRow(${row.id}, 'nombre', this.value)" 
+                               class="font-black text-sm bg-transparent w-full focus:outline-none focus:bg-white rounded px-1 ${row.nombre === 'SIN NOMBRE' ? 'text-slate-300 italic' : 'text-slate-800'}" 
+                               value="${row.nombre}">
+                        <input onchange="updateRow(${row.id}, 'email', this.value)" 
+                               class="text-[10px] font-bold text-slate-400 bg-transparent w-full focus:outline-none mt-1 focus:bg-white rounded px-1" 
+                               value="${row.email}" placeholder="Sin Email">
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="flex items-center gap-2 text-green-600 font-mono font-bold text-xs bg-green-50 px-2 py-1 rounded-lg w-fit">
+                            <i data-feather="phone" class="w-3 h-3 opacity-70"></i>
+                            <input onchange="updateRow(${row.id}, 'telefono', this.value)" 
+                                   class="bg-transparent w-24 focus:outline-none" 
+                                   value="${row.telefono}">
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-8 rounded-full shadow-sm transition-colors duration-300" style="background-color: ${careerColor}"></div>
+                            <select onchange="updateRow(${row.id}, 'tecnicaturaId', this.value)" 
+                                    class="font-bold bg-transparent text-[11px] uppercase cursor-pointer focus:outline-none w-36 py-1"
+                                    style="color: ${careerColor === '#fbc42b' ? '#b78900' : careerColor}"> <!-- Ajuste contraste amarillo -->
+                                ${optionsHtml}
+                            </select>
+                        </div>
+                    </td>
+                    <td class="px-4 py-4 text-right">
+                        <button onclick="deleteRow(${row.id})" class="text-slate-300 hover:text-red-500 p-2 transition-colors">
+                            <i data-feather="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            feather.replace();
+        }
+
+        function renderLegend() {
+            const container = document.getElementById('legend-container');
+            let html = '';
+            for (const [id, data] of Object.entries(CareerMapper)) {
+                html += `
+                    <div class="flex items-center gap-2 text-[10px] text-slate-500 font-medium">
+                        <span class="w-2 h-2 rounded-full" style="background-color: ${data.color}"></span>
+                        ${data.label.split(' ')[0]}
+                    </div>
+                `;
+            }
+            container.innerHTML = html;
+        }
+
+        function setLoading(state) {
+            isProcessing = state;
+            const dropZone = document.getElementById('drop-zone');
+            const icon = document.getElementById('status-icon');
+            const text = document.getElementById('status-text');
+            const placeholder = document.getElementById('paste-placeholder');
+
+            if (state) {
+                dropZone.classList.add('border-green-500', 'bg-green-50');
+                dropZone.classList.remove('border-white');
+                icon.innerHTML = '<div class="loader"></div>';
+                text.textContent = 'Procesando...';
+                placeholder.classList.add('opacity-50');
+            } else {
+                dropZone.classList.remove('border-green-500', 'bg-green-50');
+                dropZone.classList.add('border-white');
+                icon.innerHTML = '<i data-feather="image" class="w-4 h-4 text-blue-500"></i>';
+                text.textContent = 'Área de Captura';
+                placeholder.classList.remove('opacity-50');
+                feather.replace();
+            }
+        }
+
+        // --- Utilidades ---
+        function exportToExcel() {
+            if (rows.length === 0) return showToast('No hay datos', 'x-circle');
+            
+            const dataToExport = rows.map(r => ({
+                'Nombre Completo': r.nombre,
+                'Teléfono': r.telefono,
+                'Email': r.email,
+                'Tecnicatura ID': r.tecnicaturaId,
+                'Fuente': 'WhatsApp Comercial',
+                'Provincia': r.provincia,
+                'Estado': 'sin_contacto',
+                'Observaciones': '',
+                'Vendedor ID': r.vendedorId
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(dataToExport);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Leads");
+            XLSX.writeFile(wb, `Leads_WA_${new Date().toISOString().slice(0,10)}.xlsx`);
+            showToast('Descargando Excel...', 'download');
+        }
+
+        function copySummary() {
+            if (rows.length === 0) return showToast('Nada para copiar', 'x-circle');
+            const text = rows.map(r => `${r.nombre}\t${r.telefono}\t${r.tecnicaturaId ? CareerMapper[r.tecnicaturaId].label : 'S/D'}`).join('\n');
+            navigator.clipboard.writeText(text).then(() => showToast('Copiado al portapapeles', 'clipboard'));
+        }
+
+        function showToast(message, iconName = 'info') {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toast-icon');
+            const msg = document.getElementById('toast-message');
+
+            icon.innerHTML = `<i data-feather="${iconName}" class="w-4 h-4"></i>`;
+            msg.textContent = message;
+            feather.replace();
+
+            toast.classList.remove('translate-y-20');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20');
+            }, 3000);
+        }
+    </script>
 </body>
 </html>
