@@ -50,7 +50,7 @@
                 </div>
                 <div>
                     <h1 class="text-xl font-bold tracking-tight text-slate-800">LeadExtractor Pro</h1>
-                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">HTML Nativo • Versión 3.0</p>
+                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">HTML Nativo • Versión 3.1</p>
                 </div>
             </div>
             <div class="flex gap-2">
@@ -153,7 +153,7 @@
                                     <th class="px-6 py-4">Datos del Prospecto</th>
                                     <th class="px-6 py-4">Contacto</th>
                                     <th class="px-6 py-4">Carrera</th>
-                                    <th class="px-4 py-4 text-right"></th>
+                                    <th class="px-4 py-4 text-right">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody id="table-body" class="divide-y divide-slate-50">
@@ -462,14 +462,55 @@
                         </div>
                     </td>
                     <td class="px-4 py-4 text-right">
-                        <button onclick="deleteRow(${row.id})" class="text-slate-300 hover:text-red-500 p-2 transition-colors">
-                            <i data-feather="trash-2" class="w-4 h-4"></i>
-                        </button>
+                        <div class="flex items-center justify-end gap-1">
+                            <button onclick="copyRowToWhatsApp(${row.id})" class="text-green-600 hover:text-green-800 bg-green-50 hover:bg-green-100 p-2 rounded-lg transition-colors" title="Copiar para WhatsApp">
+                                <i data-feather="message-circle" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="deleteRow(${row.id})" class="text-slate-300 hover:text-red-500 p-2 transition-colors" title="Eliminar">
+                                <i data-feather="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
                     </td>
                 `;
                 tbody.appendChild(tr);
             });
             feather.replace();
+        }
+
+        // --- Nueva Función: Copiar Fila para WhatsApp (Fallback para evitar error de Clipboard) ---
+        function copyToClipboard(text) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed"; // Evitar scroll
+            textArea.style.left = "-9999px";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            try {
+                const successful = document.execCommand('copy');
+                document.body.removeChild(textArea);
+                return successful;
+            } catch (err) {
+                document.body.removeChild(textArea);
+                console.error('Error al copiar:', err);
+                return false;
+            }
+        }
+
+        function copyRowToWhatsApp(id) {
+            const row = rows.find(r => r.id === id);
+            if (!row) return;
+
+            const career = CareerMapper[row.tecnicaturaId]?.label || 'No especificada';
+            
+            const text = `👤 Nombre y apellido: ${row.nombre}\n📱 Teléfono: ${row.telefono}\n📧 Correo: ${row.email}\n🎓 Carrera de interés: ${career}`;
+
+            if (copyToClipboard(text)) {
+                showToast('Copiado para WhatsApp', 'check');
+            } else {
+                showToast('Error al copiar', 'alert-triangle');
+            }
         }
 
         function renderLegend() {
@@ -535,7 +576,12 @@
         function copySummary() {
             if (rows.length === 0) return showToast('Nada para copiar', 'x-circle');
             const text = rows.map(r => `${r.nombre}\t${r.telefono}\t${r.tecnicaturaId ? CareerMapper[r.tecnicaturaId].label : 'S/D'}`).join('\n');
-            navigator.clipboard.writeText(text).then(() => showToast('Copiado al portapapeles', 'clipboard'));
+            
+            if (copyToClipboard(text)) {
+                showToast('Copiado al portapapeles', 'clipboard');
+            } else {
+                showToast('Error al copiar', 'alert-triangle');
+            }
         }
 
         function showToast(message, iconName = 'info') {
