@@ -21,11 +21,9 @@
         body { background-color: #f0f2f5; font-family: -apple-system, system-ui, sans-serif; }
         .loader { border: 3px solid #f3f3f3; border-top: 3px solid #22c55e; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; display: inline-block; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        /* Animación suave */
         .fade-in { animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         
-        /* Estilos Tabs */
         .tab-active { background-color: #f1f5f9; color: #1e293b; border-bottom: 2px solid #22c55e; }
         .tab-inactive { color: #94a3b8; border-bottom: 2px solid transparent; }
         .tab-inactive:hover { color: #64748b; }
@@ -50,7 +48,7 @@
                 </div>
                 <div>
                     <h1 class="text-xl font-bold tracking-tight text-slate-800">LeadExtractor Pro</h1>
-                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">HTML Nativo • Versión 3.1</p>
+                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">HTML Nativo • V3.6</p>
                 </div>
             </div>
             <div class="flex gap-2">
@@ -69,7 +67,7 @@
             <section class="lg:col-span-4 flex flex-col gap-4">
                 
                 <div class="bg-white p-6 rounded-3xl shadow-lg border border-slate-100 transition-all duration-300">
-                    <!-- Tabs de Selección -->
+                    <!-- Tabs -->
                     <div class="flex mb-6 border-b border-slate-100">
                         <button onclick="switchTab('smart')" id="tab-smart" class="tab-active flex-1 pb-3 text-xs font-bold uppercase tracking-wider flex justify-center items-center gap-2 transition-all">
                             <i data-feather="zap" class="w-3 h-3"></i> Automático
@@ -79,7 +77,7 @@
                         </button>
                     </div>
 
-                    <!-- MODO INTELIGENTE (Dropzone) -->
+                    <!-- MODO INTELIGENTE -->
                     <div id="panel-smart" class="block">
                         <div class="flex justify-between items-center mb-3">
                             <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
@@ -96,12 +94,12 @@
                                     <i data-feather="clipboard" class="w-6 h-6 text-slate-300 group-hover:text-green-500"></i>
                                 </div>
                                 <p class="text-xs font-bold text-slate-500">Haz Clic y CTRL+V</p>
-                                <span class="text-[10px] text-slate-400 font-medium mt-1">Detecta campos automáticamente</span>
+                                <span class="text-[10px] text-slate-400 font-medium mt-1">Autocompleta Localidad y Provincia</span>
                             </div>
                         </div>
                     </div>
 
-                    <!-- MODO MANUAL (Formulario) -->
+                    <!-- MODO MANUAL -->
                     <div id="panel-manual" class="hidden space-y-3">
                         <div>
                             <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Nombre Completo</label>
@@ -109,18 +107,28 @@
                         </div>
                         <div>
                             <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Teléfono</label>
-                            <input id="manual-telefono" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm focus:outline-none focus:border-green-500" placeholder="Ej: 351 123 4567">
+                            <!-- Agregado oninput para procesar en vivo -->
+                            <input id="manual-telefono" oninput="handleManualPhoneInput(this)" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm focus:outline-none focus:border-green-500" placeholder="Ej: 3511234567">
                         </div>
-                        <div>
-                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Email</label>
-                            <input id="manual-email" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm focus:outline-none focus:border-green-500" placeholder="Ej: juan@email.com">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Email</label>
+                                <input id="manual-email" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm focus:outline-none focus:border-green-500" placeholder="@">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Provincia</label>
+                                <input id="manual-provincia" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm focus:outline-none focus:border-green-500" placeholder="Auto">
+                            </div>
                         </div>
                         <div>
                             <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Carrera</label>
                             <select id="manual-carrera" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm focus:outline-none focus:border-green-500 text-slate-600">
                                 <option value="">-- Seleccionar --</option>
-                                <!-- Se llena con JS -->
                             </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Observaciones</label>
+                            <textarea id="manual-obs" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm focus:outline-none focus:border-green-500 h-20 resize-none" placeholder="Nota opcional..."></textarea>
                         </div>
                         <button onclick="processManualEntry()" class="w-full bg-slate-800 text-white font-bold text-xs uppercase py-3 rounded-xl hover:bg-black transition-colors flex items-center justify-center gap-2 mt-2">
                             <i data-feather="plus-circle" class="w-4 h-4"></i> Agregar a Tabla
@@ -143,17 +151,17 @@
                 <div class="bg-white rounded-3xl shadow-lg border border-slate-100 overflow-hidden min-h-[500px] flex flex-col">
                     <div class="p-5 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
                         <span class="font-bold text-xs uppercase text-slate-500 tracking-wider">Registros: <span id="row-count">0</span></span>
-                        <div class="text-[10px] text-slate-400 font-medium italic">Los más recientes aparecen arriba</div>
+                        <div class="text-[10px] text-slate-400 font-medium italic">Orden: Nuevos arriba</div>
                     </div>
                     
                     <div class="overflow-x-auto flex-1">
                         <table class="w-full text-sm text-left">
                             <thead class="bg-slate-50 text-slate-400 uppercase text-[9px] font-black tracking-widest sticky top-0 z-10">
                                 <tr>
-                                    <th class="px-6 py-4">Datos del Prospecto</th>
-                                    <th class="px-6 py-4">Contacto</th>
-                                    <th class="px-6 py-4">Carrera</th>
-                                    <th class="px-4 py-4 text-right">Acciones</th>
+                                    <th class="px-4 py-4 min-w-[180px]">Datos del Prospecto</th>
+                                    <th class="px-4 py-4 min-w-[140px]">Contacto / Ubicación</th>
+                                    <th class="px-4 py-4 min-w-[160px]">Carrera / Obs</th>
+                                    <th class="px-4 py-4 text-right"></th>
                                 </tr>
                             </thead>
                             <tbody id="table-body" class="divide-y divide-slate-50">
@@ -186,24 +194,84 @@
             8: { label: 'Recursos humanos', color: '#c397c6', keywords: ['recursos humanos', 'rrhh', 'personal', 'talento', 'rh', 'seleccion'] }
         };
 
+        // --- Base de Datos Cruda de Prefijos (Compactada) ---
+        const RAW_PREFIX_DATA = `11,CABA,BUENOS AIRES;220,GENERAL LAS HERAS,BUENOS AIRES;220,LIBERTAD,BUENOS AIRES;220,MARCOS PAZ,BUENOS AIRES;220,MARIANO ACOSTA,BUENOS AIRES;220,MERLO,BUENOS AIRES;220,PLOMMER,BUENOS AIRES;220,PONTEVEDRA,BUENOS AIRES;220,VILLARS,BUENOS AIRES;2202,GONZALEZ CATAN,BUENOS AIRES;2202,VIRREY DEL PINO,BUENOS AIRES;221,LA PLATA,BUENOS AIRES;221,ABASTO,BUENOS AIRES;221,LISANDRO OLMOS,BUENOS AIRES;2221,MAGDALENA,BUENOS AIRES;2221,PUNTA INDIO,BUENOS AIRES;2221,VERONICA,BUENOS AIRES;2223,CORONEL BRANDSEN,BUENOS AIRES;2223,JEPPENER,BUENOS AIRES;2224,GLEW,BUENOS AIRES;2224,GUERNICA,BUENOS AIRES;2225,ALEJANDRO KORN,BUENOS AIRES;2225,SAN VICENTE,BUENOS AIRES;2226,CAÑUELAS,BUENOS AIRES;2227,LOBOS,BUENOS AIRES;2227,ROQUE PEREZ,BUENOS AIRES;2229,EL PATO,BUENOS AIRES;223,MAR DEL PLATA,BUENOS AIRES;223,BATAN,BUENOS AIRES;223,MAR CHIQUITA,BUENOS AIRES;223,SIERRA DE LOS PADRES,BUENOS AIRES;2241,CHASCOMUS,BUENOS AIRES;2241,RANCHOS,BUENOS AIRES;2242,LEZAMA,BUENOS AIRES;2242,PILA,BUENOS AIRES;2243,GENERAL BELGRANO,BUENOS AIRES;2244,LAS FLORES,BUENOS AIRES;2245,DOLORES,BUENOS AIRES;2245,CASTELLI,BUENOS AIRES;2246,SANTA TERESITA,BUENOS AIRES;2252,SAN CLEMENTE DEL TUYU,BUENOS AIRES;2254,PINAMAR,BUENOS AIRES;2254,CARILO,BUENOS AIRES;2255,VILLA GESELL,BUENOS AIRES;2257,MAR DE AJO,BUENOS AIRES;2257,SAN BERNARDO,BUENOS AIRES;2261,LOBERIA,BUENOS AIRES;2262,NECOCHEA,BUENOS AIRES;2264,JUAN N. FERNANDEZ,BUENOS AIRES;2265,CORONEL VIDAL,BUENOS AIRES;2266,BALCARCE,BUENOS AIRES;2267,GENERAL MADARIAGA,BUENOS AIRES;2268,MAIPU,BUENOS AIRES;2271,MONTE,BUENOS AIRES;2272,NAVARRO,BUENOS AIRES;2273,CARMEN DE ARECO,BUENOS AIRES;2274,CARLOS SPEGAZZINI,BUENOS AIRES;2281,AZUL,BUENOS AIRES;2283,TAPALQUE,BUENOS AIRES;2284,OLAVARRIA,BUENOS AIRES;2285,LAPRIDA,BUENOS AIRES;2286,GENERAL LAMADRID,BUENOS AIRES;2291,MIRAMAR,BUENOS AIRES;2292,BENITO JUAREZ,BUENOS AIRES;2296,AYACUCHO,BUENOS AIRES;2297,RAUCH,BUENOS AIRES;230,PILAR,BUENOS AIRES;230,DERQUI,BUENOS AIRES;2302,GENERAL PICO,LA PAMPA;2302,INTENDENTE ALVEAR,LA PAMPA;2314,BOLIVAR,BUENOS AIRES;2314,HENDERSON,BUENOS AIRES;2316,DAIREAUX,BUENOS AIRES;2317,9 DE JULIO,BUENOS AIRES;2320,JOSE C. PAZ,BUENOS AIRES;2323,LUJAN,BUENOS AIRES;2324,MERCEDES,BUENOS AIRES;2324,SUIPACHA,BUENOS AIRES;2325,SAN ANDRES DE GILES,BUENOS AIRES;2326,SAN ANTONIO DE ARECO,BUENOS AIRES;2331,REALICO,LA PAMPA;2333,QUEMU QUEMU,LA PAMPA;2334,EDUARDO CASTEX,LA PAMPA;2336,HUINCA RENANCO,CORDOBA;2337,AMERICA,BUENOS AIRES;2338,VICTORICA,LA PAMPA;2342,BRAGADO,BUENOS AIRES;2343,NORBERTO DE LA RIESTRA,BUENOS AIRES;2344,SALADILLO,BUENOS AIRES;2344,GENERAL ALVEAR,BUENOS AIRES;2345,25 DE MAYO,BUENOS AIRES;2346,CHIVILCOY,BUENOS AIRES;2346,ALBERTI,BUENOS AIRES;2352,CHACABUCO,BUENOS AIRES;2353,GENERAL ARENALES,BUENOS AIRES;2354,VEDIA,BUENOS AIRES;2355,LINCOLN,BUENOS AIRES;2356,GENERAL PINTO,BUENOS AIRES;2357,CARLOS TEJEDOR,BUENOS AIRES;2358,LOS TOLDOS,BUENOS AIRES;236,JUNIN,BUENOS AIRES;237,MORENO,BUENOS AIRES;237,GENERAL RODRIGUEZ,BUENOS AIRES;2392,TRENQUE LAUQUEN,BUENOS AIRES;2394,SALLIQUELO,BUENOS AIRES;2395,CARLOS CASARES,BUENOS AIRES;2396,PEHUAJO,BUENOS AIRES;2473,COLON,BUENOS AIRES;2474,SALTO,BUENOS AIRES;2475,ROJAS,BUENOS AIRES;2477,PERGAMINO,BUENOS AIRES;2478,ARRECIFES,BUENOS AIRES;249,TANDIL,BUENOS AIRES;260,SAN RAFAEL,MENDOZA;260,GENERAL ALVEAR,MENDOZA;260,MALARGUE,MENDOZA;261,MENDOZA,MENDOZA;261,GUAYMALLEN,MENDOZA;261,LUJAN DE CUYO,MENDOZA;261,MAIPU,MENDOZA;261,LAVALLE,MENDOZA;2622,TUNUYAN,MENDOZA;2622,TUPUNGATO,MENDOZA;2624,USPALLATA,MENDOZA;2625,GENERAL ALVEAR,MENDOZA;2625,BOWEN,MENDOZA;2626,LA PAZ,MENDOZA;263,SAN MARTIN,MENDOZA;263,RIVADAVIA,MENDOZA;263,JUNIN,MENDOZA;264,SAN JUAN,SAN JUAN;264,CAUCETE,SAN JUAN;264,POCITO,SAN JUAN;2646,VALLE FERTIL,SAN JUAN;2647,JACHAL,SAN JUAN;2648,CALINGASTA,SAN JUAN;2651,SAN FRANCISCO DEL MONTE DE ORO,SAN LUIS;2655,LA TOMA,SAN LUIS;2656,MERLO,SAN LUIS;2656,CONCARAN,SAN LUIS;2657,VILLA MERCEDES,SAN LUIS;2657,JUSTO DARACT,SAN LUIS;2658,BUENA ESPERANZA,SAN LUIS;266,SAN LUIS,SAN LUIS;266,LA PUNTA,SAN LUIS;280,TRELEW,CHUBUT;280,PUERTO MADRYN,CHUBUT;280,RAWSON,CHUBUT;2901,USHUAIA,TIERRA DEL FUEGO;2902,EL CALAFATE,SANTA CRUZ;2902,RIO TURBIO,SANTA CRUZ;2903,RIO MAYO,CHUBUT;291,BAHIA BLANCA,BUENOS AIRES;291,PUNTA ALTA,BUENOS AIRES;2920,VIEDMA,RIO NEGRO;2921,CORONEL DORREGO,BUENOS AIRES;2922,CORONEL PRINGLES,BUENOS AIRES;2923,PUAN,BUENOS AIRES;2924,DARREGUEIRA,BUENOS AIRES;2925,VILLA IRIS,BUENOS AIRES;2926,CORONEL SUAREZ,BUENOS AIRES;2927,MEDANOS,BUENOS AIRES;2928,PEDRO LURO,BUENOS AIRES;2929,GUAMINI,BUENOS AIRES;2931,RIO COLORADO,RIO NEGRO;2932,PUNTA ALTA,BUENOS AIRES;2934,SAN ANTONIO OESTE,RIO NEGRO;294,BARILOCHE,RIO NEGRO;294,EL BOLSON,RIO NEGRO;294,VILLA LA ANGOSTURA,NEUQUEN;2940,INGENIERO JACOBACCI,RIO NEGRO;2942,ZAPALA,NEUQUEN;2945,ESQUEL,CHUBUT;2946,CHOELE CHOEL,RIO NEGRO;2948,CHOS MALAL,NEUQUEN;2952,GENERAL ACHA,LA PAMPA;2953,MACACHIN,LA PAMPA;2954,SANTA ROSA,LA PAMPA;2962,PUERTO SANTA CRUZ,SANTA CRUZ;2963,PERITO MORENO,SANTA CRUZ;2964,RIO GRANDE,TIERRA DEL FUEGO;2966,RIO GALLEGOS,SANTA CRUZ;297,COMODORO RIVADAVIA,CHUBUT;2972,SAN MARTIN DE LOS ANDES,NEUQUEN;298,GENERAL ROCA,RIO NEGRO;2982,CLAROMECO,BUENOS AIRES;2983,TRES ARROYOS,BUENOS AIRES;299,NEUQUEN,NEUQUEN;299,CIPOLLETTI,RIO NEGRO;3327,BENAVIDEZ,BUENOS AIRES;3329,SAN PEDRO,BUENOS AIRES;3329,BARADERO,BUENOS AIRES;336,SAN NICOLAS,BUENOS AIRES;3382,RUFINO,SANTA FE;3385,LABOULAYE,CORDOBA;3387,ITALO,CORDOBA;3388,GENERAL VILLEGAS,BUENOS AIRES;3400,VILLA CONSTITUCION,SANTA FE;3401,EL TREBOL,SANTA FE;3402,ARROYO SECO,SANTA FE;3404,GALVEZ,SANTA FE;3405,SAN JAVIER,SANTA FE;3406,SAN JORGE,SANTA FE;3407,RAMALLO,BUENOS AIRES;3408,SAN CRISTOBAL,SANTA FE;3409,MOISES VILLE,SANTA FE;341,ROSARIO,SANTA FE;341,SAN LORENZO,SANTA FE;342,SANTA FE,SANTA FE;342,SANTO TOME,SANTA FE;343,PARANA,ENTRE RIOS;343,DIAMANTE,ENTRE RIOS;3435,NOGOYA,ENTRE RIOS;3436,VICTORIA,ENTRE RIOS;3437,LA PAZ,ENTRE RIOS;3438,BOVRIL,ENTRE RIOS;3442,CONCEPCION DEL URUGUAY,ENTRE RIOS;3444,GUALEGUAY,ENTRE RIOS;3445,ROSARIO DEL TALA,ENTRE RIOS;3446,GUALEGUAYCHU,ENTRE RIOS;3447,COLON,ENTRE RIOS;345,CONCORDIA,ENTRE RIOS;3454,FEDERAL,ENTRE RIOS;3455,VILLAGUAY,ENTRE RIOS;3456,CHAJARI,ENTRE RIOS;3458,SAN JOSE DE FELICIANO,ENTRE RIOS;3460,SANTA TERESA,SANTA FE;3462,VENADO TUERTO,SANTA FE;3463,CANALS,CORDOBA;3464,CASILDA,SANTA FE;3465,FIRMAT,SANTA FE;3466,BARRANCAS,SANTA FE;3467,CRUZ ALTA,CORDOBA;3468,CORRAL DE BUSTOS,CORDOBA;3469,ACEBAL,SANTA FE;3471,CAÑADA DE GOMEZ,SANTA FE;3472,MARCOS JUAREZ,CORDOBA;3476,SAN LORENZO,SANTA FE;348,ESCOBAR,BUENOS AIRES;3482,RECONQUISTA,SANTA FE;3483,VERA,SANTA FE;3487,ZARATE,BUENOS AIRES;3489,CAMPANA,BUENOS AIRES;3491,CERES,SANTA FE;3492,RAFAELA,SANTA FE;3493,SUNCHALES,SANTA FE;3496,ESPERANZA,SANTA FE;3497,LLAMBI CAMPBELL,SANTA FE;3498,SAN JUSTO,SANTA FE;351,CORDOBA,CORDOBA;3521,DEAN FUNES,CORDOBA;3522,VILLA DE MARIA,CORDOBA;3524,VILLA DEL TOTORAL,CORDOBA;3525,JESUS MARIA,CORDOBA;353,VILLA MARIA,CORDOBA;3532,OLIVA,CORDOBA;3533,LAS VARILLAS,CORDOBA;3537,BELL VILLE,CORDOBA;3541,VILLA CARLOS PAZ,CORDOBA;3541,COSQUIN,CORDOBA;3542,SALSACATE,CORDOBA;3543,RIO CEBALLOS,CORDOBA;3543,VILLA ALLENDE,CORDOBA;3544,VILLA DOLORES,CORDOBA;3544,MINA CLAVERO,CORDOBA;3546,SANTA ROSA DE CALAMUCHITA,CORDOBA;3547,ALTA GRACIA,CORDOBA;3548,LA FALDA,CORDOBA;3549,CRUZ DEL EJE,CORDOBA;3562,MORTEROS,CORDOBA;3563,BALNEARIA,CORDOBA;3564,SAN FRANCISCO,CORDOBA;3571,RIO TERCERO,CORDOBA;3572,RIO SEGUNDO,CORDOBA;3573,VILLA DEL ROSARIO,CORDOBA;3574,RIO PRIMERO,CORDOBA;3575,OBISPO TREJO,CORDOBA;3576,ARROYITO,CORDOBA;358,RIO CUARTO,CORDOBA;3582,SAMPACHO,CORDOBA;3583,VICUÑA MACKENNA,CORDOBA;3584,LA CARLOTA,CORDOBA;3585,ADELIA MARIA,CORDOBA;362,RESISTENCIA,CHACO;364,SAENZ PEÑA,CHACO;370,FORMOSA,FORMOSA;3711,INGENIERO JUAREZ,FORMOSA;3715,LAS LOMITAS,FORMOSA;3716,IBARRETA,FORMOSA;3718,CLORINDA,FORMOSA;3721,CHARADAI,CHACO;3725,GENERAL SAN MARTIN,CHACO;3731,CHARATA,CHACO;3734,MACHAGAI,CHACO;3735,VILLA ANGELA,CHACO;3741,BERNARDO DE IRIGOYEN,MISIONES;3743,PUERTO RICO,MISIONES;3751,ELDORADO,MISIONES;3754,LEANDRO N. ALEM,MISIONES;3755,OBERA,MISIONES;3756,SANTO TOME,CORRIENTES;3757,PUERTO IGUAZU,MISIONES;3758,APOSTOLES,MISIONES;376,POSADAS,MISIONES;3772,PASO DE LOS LIBRES,CORRIENTES;3773,MERCEDES,CORRIENTES;3774,CURUZU CUATIA,CORRIENTES;3775,MONTE CASEROS,CORRIENTES;3777,GOYA,CORRIENTES;3781,CAA CATI,CORRIENTES;3782,SALADAS,CORRIENTES;3786,ITUZAINGO,CORRIENTES;379,CORRIENTES,CORRIENTES;380,LA RIOJA,LA RIOJA;381,SAN MIGUEL DE TUCUMAN,TUCUMAN;3821,CHEPES,LA RIOJA;3825,CHILECITO,LA RIOJA;3826,CHAMICAL,LA RIOJA;3827,AIMOGASTA,LA RIOJA;383,CATAMARCA,CATAMARCA;3832,RECREO,CATAMARCA;3835,ANDALGALA,CATAMARCA;3835,BELEN,CATAMARCA;3837,TINOGASTA,CATAMARCA;3838,SANTA MARIA,CATAMARCA;3841,MONTE QUEMADO,SANTIAGO DEL ESTERO;3843,QUIMILI,SANTIAGO DEL ESTERO;3844,AÑATUYA,SANTIAGO DEL ESTERO;3845,LORETO,SANTIAGO DEL ESTERO;3846,CAMPO GALLO,SANTIAGO DEL ESTERO;385,SANTIAGO DEL ESTERO,SANTIAGO DEL ESTERO;3854,FRIAS,SANTIAGO DEL ESTERO;3855,SUNCHO CORRAL,SANTIAGO DEL ESTERO;3856,SUMAMPA,SANTIAGO DEL ESTERO;3857,BANDERA,SANTIAGO DEL ESTERO;3858,TERMAS DE RIO HONDO,SANTIAGO DEL ESTERO;3861,NUEVA ESPERANZA,SANTIAGO DEL ESTERO;3862,TRANCAS,TUCUMAN;3863,MONTEROS,TUCUMAN;3865,CONCEPCION,TUCUMAN;3867,TAFI DEL VALLE,TUCUMAN;3868,CAFAYATE,SALTA;3869,BANDA DEL RIO SALI,TUCUMAN;387,SALTA,SALTA;3873,TARTAGAL,SALTA;3876,METAN,SALTA;3877,JOAQUIN V. GONZALEZ,SALTA;3878,ORAN,SALTA;388,SAN SALVADOR DE JUJUY,JUJUY;3885,LA QUIACA,JUJUY;3886,LIBERTADOR GENERAL SAN MARTIN,JUJUY;3887,HUMAHUACA,JUJUY;3888,SAN PEDRO,JUJUY;3891,LA MADRID,TUCUMAN;3892,AMAICHA DEL VALLE,TUCUMAN;3894,BURRUYACU,TUCUMAN`;
+
+        let PrefixMap = {};
+        
+        // Declaramos 'rows' y 'isProcessing' aquí para que sean globales y accesibles por todas las funciones.
         let rows = [];
         let isProcessing = false;
 
         // --- Inicialización ---
         document.addEventListener('DOMContentLoaded', () => {
+            initPrefixMap();
             feather.replace();
             renderLegend();
             populateManualSelect();
             setupPasteListener();
         });
 
-        // --- Utilidad: Title Case ---
+        // --- Procesar Base de Datos de Prefijos ---
+        function initPrefixMap() {
+            const lines = RAW_PREFIX_DATA.split(';');
+            lines.forEach(line => {
+                const parts = line.split(',');
+                if (parts.length >= 3) {
+                    const code = parts[0].trim();
+                    const city = parts[1].trim();
+                    const prov = parts[2].trim();
+                    
+                    if (!PrefixMap[code]) {
+                        PrefixMap[code] = { cities: new Set(), province: prov };
+                    }
+                    PrefixMap[code].cities.add(city);
+                }
+            });
+        }
+
+        // --- Utilidades ---
         function toTitleCase(str) {
             if (!str) return '';
             if (str === 'SIN NOMBRE') return str;
-            return str.toLowerCase().split(' ').map(function(word) {
-                return word.charAt(0).toUpperCase() + word.slice(1);
-            }).join(' ');
+            return str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+        }
+
+        function detectProvince(phone) {
+            if (!phone) return '';
+            let clean = phone.replace(/\D/g, '');
+            
+            // Si viene con 549 adelante, lo quitamos
+            if (clean.startsWith('549')) clean = clean.substring(3);
+            else if (clean.startsWith('54')) clean = clean.substring(2);
+            else if (clean.startsWith('15')) clean = clean.substring(2);
+
+            // Intentar encontrar el prefijo más largo posible (4, 3, 2 dígitos)
+            for (let len = 4; len >= 2; len--) {
+                const sub = clean.substring(0, len);
+                if (PrefixMap[sub]) {
+                    const data = PrefixMap[sub];
+                    // Formatear: "Ciudad, PROVINCIA"
+                    // SOLO MOSTRAR LA PRIMERA CIUDAD
+                    const citiesArray = Array.from(data.cities);
+                    return `${citiesArray[0]}, ${data.province}`;
+                }
+            }
+            return '';
+        }
+
+        // --- Evento Input para Manual ---
+        function handleManualPhoneInput(inputElement) {
+            // 1. Limpieza en vivo (Todo de corrido)
+            let val = inputElement.value.replace(/\D/g, '');
+            inputElement.value = val;
+
+            // 2. Detección de provincia en vivo
+            const detected = detectProvince(val);
+            const provInput = document.getElementById('manual-provincia');
+            if (detected) {
+                provInput.value = detected;
+            }
         }
 
         // --- Gestión de Tabs ---
@@ -238,22 +306,27 @@
 
         function processManualEntry() {
             const nombre = document.getElementById('manual-nombre').value;
-            const telefono = document.getElementById('manual-telefono').value;
+            let telefono = document.getElementById('manual-telefono').value;
             const email = document.getElementById('manual-email').value;
             const carrera = document.getElementById('manual-carrera').value;
+            const obs = document.getElementById('manual-obs').value;
+            let provincia = document.getElementById('manual-provincia').value;
+
+            // Limpieza estricta de teléfono (por seguridad, aunque el oninput ya limpia)
+            telefono = telefono.replace(/\D/g, '');
 
             if (!nombre && !telefono && !email) return showToast('Ingresa al menos un dato', 'alert-circle');
 
             const data = {
                 id: Date.now(),
                 nombre: toTitleCase(nombre) || 'SIN NOMBRE',
-                telefono: telefono.replace(/\D/g, '') || '',
+                telefono: telefono,
                 email: email || '',
                 tecnicaturaId: carrera || '',
+                provincia: provincia || '',
+                observaciones: obs || '',
                 fuente: 'WhatsApp Comercial',
-                provincia: '',
                 estado: 'sin_contacto',
-                observaciones: '',
                 vendedorId: ''
             };
 
@@ -264,7 +337,9 @@
             document.getElementById('manual-nombre').value = '';
             document.getElementById('manual-telefono').value = '';
             document.getElementById('manual-email').value = '';
+            document.getElementById('manual-provincia').value = '';
             document.getElementById('manual-carrera').value = '';
+            document.getElementById('manual-obs').value = '';
         }
 
         // --- Lógica de Parsing Inteligente ---
@@ -285,7 +360,10 @@
                 validPhone = best ? best.val : '';
             }
 
-            // 3. Carrera
+            // 3. Provincia
+            const provincia = detectProvince(validPhone);
+
+            // 4. Carrera
             let bestId = '', maxScore = 0;
             for (const [id, data] of Object.entries(CareerMapper)) {
                 let score = 0;
@@ -296,11 +374,13 @@
                 if (score > maxScore) { maxScore = score; bestId = id; }
             }
 
-            // 4. Nombre
+            // 5. Nombre
             const blackList = ['hola','interesa','quiero','info','precio','mensaje','cifrados','ayer','hoy','anuncio','facebook','cervantes','clic','error','foto','escribiendo','linea','bloquear','seguridad','contacto','perfil','cuenta','business', 'vez'];
             
-            let clean = text.replace(email, '').replace(validPhone, '');
-            const lines = clean.split(/[\n]/).map(l => l.trim()).filter(l => l.length > 2);
+            let clean = text.replace(email, '').replace(validPhone, ''); 
+            if (email) clean = clean.replace(email, '');
+            
+            const lines = text.split(/[\n]/).map(l => l.trim()).filter(l => l.length > 2);
             
             let likelyName = 'SIN NOMBRE';
             const candidate = lines.slice(0, 6).find(l => {
@@ -308,24 +388,24 @@
                 const hasDigit = /\d/.test(l);
                 const isBlacklisted = blackList.some(b => low.includes(b));
                 const words = l.split(' ').length;
-                return !hasDigit && !isBlacklisted && words <= 4 && !l.includes(':');
+                return !hasDigit && !isBlacklisted && words <= 4 && !l.includes(':') && !l.includes('@');
             });
 
             if (candidate) {
                 const n = candidate.replace(/[^a-zA-Z\s\u00C0-\u00FF]/g, '').trim();
-                if (n.length > 2) likelyName = toTitleCase(n); // APLICAR TITLE CASE AQUÍ
+                if (n.length > 2) likelyName = toTitleCase(n);
             }
 
             return {
                 id: Date.now(),
                 nombre: likelyName,
-                telefono: validPhone.trim(),
+                telefono: validPhone,
                 email: email,
                 tecnicaturaId: bestId,
+                provincia: provincia,
+                observaciones: '', 
                 fuente: 'WhatsApp Comercial',
-                provincia: '',
                 estado: 'sin_contacto',
-                observaciones: '',
                 vendedorId: ''
             };
         }
@@ -387,19 +467,21 @@
 
         // --- Gestión de la UI ---
         function addRow(data) {
-            rows.unshift(data); // Agregar al principio
+            rows.unshift(data);
             renderTable();
         }
 
         function updateRow(id, field, value) {
             const row = rows.find(r => r.id === id);
             if (row) {
-                // Si actualizan nombre manualmente, aplicar Title Case
-                if (field === 'nombre') {
-                    value = toTitleCase(value);
+                if (field === 'nombre') value = toTitleCase(value);
+                if (field === 'telefono') {
+                    value = value.replace(/\D/g, ''); 
+                    row.provincia = detectProvince(value);
                 }
+                
                 row[field] = value;
-                renderTable(); // Re-renderizar para ver cambios de formato o color
+                renderTable(); 
             }
         }
 
@@ -435,7 +517,7 @@
                 }
 
                 tr.innerHTML = `
-                    <td class="px-6 py-4">
+                    <td class="px-4 py-4 align-top">
                         <input onchange="updateRow(${row.id}, 'nombre', this.value)" 
                                class="font-black text-sm bg-transparent w-full focus:outline-none focus:bg-white rounded px-1 ${row.nombre === 'SIN NOMBRE' ? 'text-slate-300 italic' : 'text-slate-800'}" 
                                value="${row.nombre}">
@@ -443,25 +525,31 @@
                                class="text-[10px] font-bold text-slate-400 bg-transparent w-full focus:outline-none mt-1 focus:bg-white rounded px-1" 
                                value="${row.email}" placeholder="Sin Email">
                     </td>
-                    <td class="px-6 py-4">
+                    <td class="px-4 py-4 align-top space-y-1">
                         <div class="flex items-center gap-2 text-green-600 font-mono font-bold text-xs bg-green-50 px-2 py-1 rounded-lg w-fit">
                             <i data-feather="phone" class="w-3 h-3 opacity-70"></i>
                             <input onchange="updateRow(${row.id}, 'telefono', this.value)" 
                                    class="bg-transparent w-24 focus:outline-none" 
                                    value="${row.telefono}">
                         </div>
+                        <input onchange="updateRow(${row.id}, 'provincia', this.value)"
+                               class="text-[10px] font-medium text-slate-500 bg-transparent w-full focus:outline-none focus:bg-white rounded px-1 placeholder-slate-300"
+                               value="${row.provincia}" placeholder="Provincia...">
                     </td>
-                    <td class="px-6 py-4">
+                    <td class="px-4 py-4 align-top space-y-1">
                         <div class="flex items-center gap-2">
-                            <div class="w-2 h-8 rounded-full shadow-sm transition-colors duration-300" style="background-color: ${careerColor}"></div>
+                            <div class="w-2 h-4 rounded-full shadow-sm transition-colors duration-300" style="background-color: ${careerColor}"></div>
                             <select onchange="updateRow(${row.id}, 'tecnicaturaId', this.value)" 
                                     class="font-bold bg-transparent text-[11px] uppercase cursor-pointer focus:outline-none w-36 py-1"
                                     style="color: ${careerColor === '#fbc42b' ? '#b78900' : careerColor}">
                                 ${optionsHtml}
                             </select>
                         </div>
+                        <input onchange="updateRow(${row.id}, 'observaciones', this.value)"
+                               class="text-[10px] text-slate-600 bg-slate-100/50 w-full rounded px-2 py-1 focus:outline-none focus:bg-white border border-transparent focus:border-slate-200"
+                               value="${row.observaciones}" placeholder="Agregar observación...">
                     </td>
-                    <td class="px-4 py-4 text-right">
+                    <td class="px-4 py-4 align-top text-right">
                         <div class="flex items-center justify-end gap-1">
                             <button onclick="copyRowToWhatsApp(${row.id})" class="text-green-600 hover:text-green-800 bg-green-50 hover:bg-green-100 p-2 rounded-lg transition-colors" title="Copiar para WhatsApp">
                                 <i data-feather="message-circle" class="w-4 h-4"></i>
@@ -477,11 +565,11 @@
             feather.replace();
         }
 
-        // --- Nueva Función: Copiar Fila para WhatsApp (Fallback para evitar error de Clipboard) ---
+        // --- Funciones de Utilidad ---
         function copyToClipboard(text) {
             const textArea = document.createElement("textarea");
             textArea.value = text;
-            textArea.style.position = "fixed"; // Evitar scroll
+            textArea.style.position = "fixed";
             textArea.style.left = "-9999px";
             document.body.appendChild(textArea);
             textArea.focus();
@@ -493,7 +581,6 @@
                 return successful;
             } catch (err) {
                 document.body.removeChild(textArea);
-                console.error('Error al copiar:', err);
                 return false;
             }
         }
@@ -503,7 +590,6 @@
             if (!row) return;
 
             const career = CareerMapper[row.tecnicaturaId]?.label || 'No especificada';
-            
             const text = `👤 Nombre y apellido: ${row.nombre}\n📱 Teléfono: ${row.telefono}\n📧 Correo: ${row.email}\n🎓 Carrera de interés: ${career}`;
 
             if (copyToClipboard(text)) {
@@ -550,7 +636,6 @@
             }
         }
 
-        // --- Utilidades ---
         function exportToExcel() {
             if (rows.length === 0) return showToast('No hay datos', 'x-circle');
             
@@ -562,7 +647,7 @@
                 'Fuente': 'WhatsApp Comercial',
                 'Provincia': r.provincia,
                 'Estado': 'sin_contacto',
-                'Observaciones': '',
+                'Observaciones': r.observaciones,
                 'Vendedor ID': r.vendedorId
             }));
 
