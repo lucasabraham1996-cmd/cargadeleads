@@ -1,709 +1,996 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LeadExtractor Pro - V4</title>
-    
-    <!-- 1. Tailwind CSS (Diseño) -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- 2. Excel (SheetJS) -->
-    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-    
-    <!-- 3. OCR (Tesseract.js) -->
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    
-    <!-- Iconos (Feather Icons) -->
-    <script src="https://unpkg.com/feather-icons"></script>
-
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
-        body { 
-            background-color: #f8fafc; 
-            /* Fondo Moderno Minimalista (Dot Grid SaaS) */
-            background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
-            background-size: 26px 26px;
-            color: #0f172a; 
-            font-family: 'Inter', -apple-system, system-ui, sans-serif;
-        }
-        
-        /* Glassmorphism Panel */
-        .glass-panel {
-            background: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.5);
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
-        }
-
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-
-        .loader { border: 3px solid #f3f3f3; border-top: 3px solid #22c55e; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; display: inline-block; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        .fade-in { animation: fadeIn 0.3s ease-in-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        
-        .tab-active { background-color: rgba(255, 255, 255, 0.9); color: #0f172a; border-bottom: 2px solid #22c55e; box-shadow: 0 -2px 10px rgba(0,0,0,0.02); }
-        .tab-inactive { color: #94a3b8; border-bottom: 2px solid transparent; }
-        .tab-inactive:hover { color: #64748b; background-color: rgba(255,255,255,0.4); }
-
-        /* Invisible Inputs (Para la tabla) */
-        .invisible-input {
-            background: transparent;
-            border: 1px solid transparent;
-            transition: all 0.2s;
-            border-radius: 6px;
-        }
-        .invisible-input:hover, .invisible-input:focus {
-            background: white;
-            border-color: #e2e8f0;
-            outline: none;
-            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Extractor de Leads para CRM</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script src="https://unpkg.com/feather-icons"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    * { box-sizing: border-box; }
+    :root {
+      --slate-950: #020617;
+      --slate-900: #0f172a;
+      --slate-800: #1e293b;
+      --slate-700: #334155;
+      --slate-500: #64748b;
+      --slate-200: #e2e8f0;
+      --slate-100: #f1f5f9;
+      --white: #ffffff;
+      --indigo: #4f46e5;
+      --indigo-soft: rgba(79, 70, 229, .08);
+      --emerald-soft: rgba(16, 185, 129, .10);
+    }
+    body {
+      margin: 0;
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: var(--slate-900);
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at top left, rgba(79,70,229,.12), transparent 22%),
+        radial-gradient(circle at top right, rgba(16,185,129,.12), transparent 24%),
+        linear-gradient(180deg, #f8fafc 0%, #eef2ff 30%, #f8fafc 100%);
+    }
+    .shell { max-width: 1560px; margin: 0 auto; padding: 22px; }
+    .glass {
+      background: rgba(255,255,255,.86);
+      border: 1px solid rgba(226,232,240,.92);
+      box-shadow: 0 18px 50px rgba(15,23,42,.07);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+    .hero {
+      background:
+        linear-gradient(135deg, rgba(15,23,42,.98), rgba(30,41,59,.96));
+      color: white;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 0% 0%, rgba(99,102,241,.30), transparent 30%),
+        radial-gradient(circle at 100% 100%, rgba(16,185,129,.20), transparent 28%);
+      pointer-events: none;
+    }
+    .soft-grid {
+      background-image: radial-gradient(rgba(148,163,184,.22) 1px, transparent 1px);
+      background-size: 22px 22px;
+    }
+    .tab { transition: .2s ease; }
+    .tab.active {
+      color: #fff;
+      background: linear-gradient(135deg, #0f172a, #334155);
+      box-shadow: 0 10px 26px rgba(15,23,42,.18);
+    }
+    .drop-zone { transition: .22s ease; }
+    .drop-zone.dragging {
+      border-color: #4f46e5 !important;
+      background: #eef2ff !important;
+      transform: translateY(-1px);
+    }
+    .editable {
+      border: 1px solid transparent;
+      background: transparent;
+      border-radius: 12px;
+      transition: .16s ease;
+    }
+    .editable:hover, .editable:focus {
+      background: #fff;
+      border-color: #dbe4f0;
+      outline: none;
+      box-shadow: 0 1px 3px rgba(15,23,42,.06);
+    }
+    .lead-card {
+      border: 1px solid rgba(226,232,240,.88);
+      background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(248,250,252,.92));
+      box-shadow: 0 10px 26px rgba(15,23,42,.05);
+      transition: .18s ease;
+    }
+    .lead-card:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 16px 34px rgba(15,23,42,.08);
+    }
+    .loader {
+      width: 20px; height: 20px; border: 3px solid #e2e8f0;
+      border-top-color: #4f46e5; border-radius: 50%; animation: spin .75s linear infinite;
+    }
+    .sticky-header { position: sticky; top: 0; z-index: 20; }
+    .lead-list { min-height: 560px; max-height: calc(100vh - 250px); overflow-y: auto; }
+    .no-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+    .no-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+    .no-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    .enter { animation: enter .24s ease both; }
+  </style>
 </head>
 <body>
-    <!-- Notificación Toast -->
-    <div id="toast" class="fixed bottom-5 right-5 bg-slate-800/95 backdrop-blur-md text-white px-6 py-3 rounded-2xl shadow-2xl transform translate-y-20 transition-transform duration-300 z-50 flex items-center gap-3 font-medium text-sm border border-slate-700">
-        <span id="toast-icon"></span>
-        <span id="toast-message">Mensaje</span>
-    </div>
-
-    <!-- Contenedor Principal -->
-    <div class="max-w-7xl mx-auto p-4 md:p-6 min-h-screen flex flex-col gap-6 relative z-10">
-        
-        <!-- Header -->
-        <header class="glass-panel p-4 rounded-2xl flex flex-col md:flex-row justify-between items-center gap-4">
-            <div class="flex items-center gap-4">
-                <div class="bg-gradient-to-br from-green-400 to-green-600 p-2.5 rounded-xl text-white shadow-lg shadow-green-500/30">
-                    <i data-feather="box" class="w-6 h-6"></i>
-                </div>
-                <div>
-                    <h1 class="text-xl font-extrabold tracking-tight text-slate-800">LeadExtractor <span class="text-green-500">Pro</span></h1>
-                    <p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Workspace • V4.0</p>
-                </div>
-            </div>
-            <div class="flex gap-2">
-                <button onclick="copySummary()" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition-all shadow-sm">
-                    <i data-feather="copy" class="w-4 h-4 text-slate-400"></i> Copiar Todo
-                </button>
-                <button onclick="exportToExcel()" class="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2 rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg shadow-slate-900/20 transition-transform active:scale-95">
-                    <i data-feather="download" class="w-4 h-4"></i> Excel
-                </button>
-            </div>
-        </header>
-
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            
-            <!-- Panel Izquierdo: Métodos de Ingreso -->
-            <section class="lg:col-span-4 flex flex-col gap-4">
-                
-                <div class="glass-panel p-6 rounded-3xl transition-all duration-300">
-                    <!-- Tabs -->
-                    <div class="flex mb-6 rounded-xl overflow-hidden bg-slate-100/50 p-1 border border-slate-200/60">
-                        <button onclick="switchTab('smart')" id="tab-smart" class="tab-active flex-1 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-wider flex justify-center items-center gap-2 transition-all">
-                            <i data-feather="zap" class="w-3.5 h-3.5"></i> Automático
-                        </button>
-                        <button onclick="switchTab('manual')" id="tab-manual" class="tab-inactive flex-1 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-wider flex justify-center items-center gap-2 transition-all">
-                            <i data-feather="edit-3" class="w-3.5 h-3.5"></i> Manual
-                        </button>
-                    </div>
-
-                    <!-- MODO INTELIGENTE -->
-                    <div id="panel-smart" class="block fade-in">
-                        <div class="flex justify-between items-center mb-3">
-                            <h3 class="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                                <span id="status-icon"><i data-feather="cpu" class="w-3.5 h-3.5 text-indigo-500"></i></span>
-                                <span id="status-text">Analizador Inteligente</span>
-                            </h3>
-                        </div>
-
-                        <div id="drop-zone" class="relative w-full h-52 bg-white/50 rounded-2xl border-2 border-dashed border-slate-300 hover:border-indigo-400 hover:bg-indigo-50/50 transition-all cursor-pointer overflow-hidden group">
-                            <textarea id="paste-input" class="absolute inset-0 w-full h-full p-6 bg-transparent resize-none text-xs focus:outline-none z-10 text-center flex items-center justify-center placeholder:text-transparent text-slate-700 font-medium" placeholder="Pega aquí..."></textarea>
-                            
-                            <div id="paste-placeholder" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none transition-opacity duration-300">
-                                <div class="bg-white p-3.5 rounded-2xl shadow-sm mb-3 group-hover:scale-110 group-hover:shadow-md transition-all border border-slate-100">
-                                    <i data-feather="clipboard" class="w-6 h-6 text-slate-400 group-hover:text-indigo-500 transition-colors"></i>
-                                </div>
-                                <p class="text-xs font-bold text-slate-600">Haz Clic y CTRL+V</p>
-                                <span class="text-[10px] text-slate-400 font-medium mt-1">Extrae: Nombre, Teléfono, Carrera, Obs.</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- MODO MANUAL -->
-                    <div id="panel-manual" class="hidden space-y-3 fade-in">
-                        <div>
-                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nombre Completo</label>
-                            <input id="manual-nombre" class="w-full bg-white/80 border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all" placeholder="Ej: Juan Perez">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Teléfono</label>
-                            <input id="manual-telefono" oninput="handleManualPhoneInput(this)" class="w-full bg-white/80 border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all" placeholder="Ej: 3511234567">
-                        </div>
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Email</label>
-                                <input id="manual-email" class="w-full bg-white/80 border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all" placeholder="@">
-                            </div>
-                            <div>
-                                <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Provincia</label>
-                                <input id="manual-provincia" class="w-full bg-white/80 border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all" placeholder="Auto">
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Carrera</label>
-                            <select id="manual-carrera" class="w-full bg-white/80 border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all text-slate-600">
-                                <option value="">-- Seleccionar --</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Observaciones</label>
-                            <textarea id="manual-obs" class="w-full bg-white/80 border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all h-16 resize-none" placeholder="Nota opcional..."></textarea>
-                        </div>
-                        <button onclick="processManualEntry()" class="w-full bg-slate-900 text-white font-bold text-xs uppercase py-3.5 rounded-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2 mt-2 shadow-lg shadow-slate-900/20">
-                            <i data-feather="plus" class="w-4 h-4"></i> Agregar a Tabla
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Referencia de Colores -->
-                <div class="glass-panel p-5 rounded-3xl">
-                    <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">Leyenda de Carreras</h4>
-                    <div class="grid grid-cols-2 gap-2.5" id="legend-container">
-                        <!-- Se llena con JS -->
-                    </div>
-                </div>
-            </section>
-
-            <!-- Panel Derecho: Tabla -->
-            <section class="lg:col-span-8">
-                <div class="glass-panel rounded-3xl overflow-hidden min-h-[550px] flex flex-col">
-                    <div class="px-6 py-4 border-b border-slate-200/60 flex justify-between items-center bg-white/40">
-                        <span class="font-bold text-xs uppercase text-slate-600 tracking-wider flex items-center gap-2">
-                            <i data-feather="database" class="w-3.5 h-3.5 text-slate-400"></i>
-                            Registros: <span id="row-count" class="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-md">0</span>
-                        </span>
-                        <div class="text-[10px] text-slate-500 font-semibold bg-white/60 px-2 py-1 rounded-lg">Nuevos arriba ↑</div>
-                    </div>
-                    
-                    <div class="overflow-x-auto flex-1">
-                        <table class="w-full text-sm text-left">
-                            <thead class="bg-slate-50/80 text-slate-500 uppercase text-[10px] font-bold tracking-widest sticky top-0 z-10 border-b border-slate-200/60">
-                                <tr>
-                                    <th class="px-6 py-4 min-w-[200px]">Prospecto</th>
-                                    <th class="px-6 py-4 min-w-[160px]">Contacto</th>
-                                    <th class="px-6 py-4 min-w-[220px]">Interés / Notas</th>
-                                    <th class="px-6 py-4 text-right"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="table-body" class="divide-y divide-slate-100/60">
-                                <!-- Filas generadas por JS -->
-                            </tbody>
-                        </table>
-                        
-                        <!-- Estado Vacío -->
-                        <div id="empty-state" class="flex flex-col items-center justify-center py-24 text-slate-400">
-                            <div class="bg-slate-100/50 p-4 rounded-full mb-4">
-                                <i data-feather="inbox" class="w-8 h-8 text-slate-300"></i>
-                            </div>
-                            <p class="font-medium text-sm">Esperando extraer datos...</p>
-                            <p class="text-[11px] text-slate-400 mt-1">Pega un texto en el panel izquierdo</p>
-                        </div>
-                    </div>
-                </div>
-            </section>
+<div class="shell">
+  <header class="hero rounded-[30px] px-5 py-5 md:px-7 md:py-6 mb-5">
+    <div class="relative z-10 flex flex-col xl:flex-row xl:items-center justify-between gap-5">
+      <div class="flex items-start gap-4">
+        <div class="w-14 h-14 rounded-2xl bg-white/10 border border-white/10 text-white flex items-center justify-center shadow-lg shadow-black/20 shrink-0">
+          <i data-feather="layers" class="w-7 h-7"></i>
         </div>
+        <div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight">Extractor de Leads para CRM</h1>
+            <span class="text-[10px] font-extrabold tracking-[.18em] uppercase bg-white/10 border border-white/10 text-indigo-100 px-3 py-1 rounded-full">V6 Pro</span>
+          </div>
+          <p class="text-sm md:text-[15px] text-slate-200/90 mt-2 max-w-3xl">Reconoce datos desde WhatsApp, correos, texto pegado y capturas de pantalla. Clasifica mejor la carrera consultada, entiende iniciales, nombres de perfil y sinónimos afines.</p>
+        </div>
+      </div>
+      <div class="flex gap-2 items-center flex-wrap">
+        <button onclick="copySummary()" class="px-4 py-2.5 rounded-xl bg-white text-slate-700 text-xs font-bold flex items-center gap-2 hover:bg-slate-100">
+          <i data-feather="copy" class="w-4 h-4"></i> Copiar todo
+        </button>
+        <button onclick="exportToExcel()" class="px-4 py-2.5 rounded-xl bg-indigo-500 text-white text-xs font-bold flex items-center gap-2 hover:bg-indigo-400 shadow-lg shadow-indigo-900/20">
+          <i data-feather="download" class="w-4 h-4"></i> Exportar Excel
+        </button>
+      </div>
     </div>
+  </header>
 
-    <!-- LÓGICA DE LA APLICACIÓN -->
-    <script>
-        // --- DATA & CONFIG ORIGINAL ---
-        const CareerMapper = {
-            1: { label: 'Desarrollo web', color: '#b8a68e', keywords: ['desarrollo de web', 'desarrollo web', 'programacion', 'full stack', 'backend', 'frontend', 'dw', 'software', 'codigo'] },
-            2: { label: 'Administración de empresas', color: '#859f4f', keywords: ['administracion', 'administración', 'admin', 'empresas', 'ae', 'negocios', 'gestion', 'contable'] },
-            3: { label: 'Marketing', color: '#ff7b1c', keywords: ['marketing', 'mercadeo', 'publicidad', 'mkt', 'redes', 'community', 'digital'] },
-            4: { label: 'Higiene y seguridad', color: '#fbc42b', keywords: ['higiene', 'seguridad', 'prevencion', 'prevención', 'hys', 'riesgos'] },
-            5: { label: 'Gestión inmobiliaria', color: '#be2528', keywords: ['gestion inmobiliaria', 'tasacion', 'tasación', 'cotizacion', 'inmobiliaria', 'legales', 'negociacion', 'gi', 'martillero', 'corredor'] },
-            6: { label: 'Analista de sistemas', color: '#00adef', keywords: ['analista', 'sistemas', 'asc', 'informatica', 'computacion'] },
-            7: { label: 'Ciencia de datos e IA', color: '#405ba8', keywords: ['inteligencia artificial', 'ia', 'datos', 'data', 'science', 'machine learning'] },
-            8: { label: 'Recursos humanos', color: '#c397c6', keywords: ['recursos humanos', 'rrhh', 'personal', 'talento', 'rh', 'seleccion'] }
-        };
+  <div class="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
+    <aside class="xl:col-span-4 space-y-5 xl:sticky xl:top-5 self-start">
+      <section class="glass rounded-[28px] p-5 md:p-6">
+        <div class="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-2xl mb-5">
+          <button id="tab-smart" onclick="switchTab('smart')" class="tab active rounded-xl py-2.5 text-xs font-bold flex items-center justify-center gap-2"><i data-feather="sparkles" class="w-4 h-4"></i> Automático</button>
+          <button id="tab-manual" onclick="switchTab('manual')" class="tab rounded-xl py-2.5 text-xs font-bold text-slate-500 flex items-center justify-center gap-2"><i data-feather="edit-3" class="w-4 h-4"></i> Manual</button>
+        </div>
 
-        const RAW_PREFIX_DATA = `11,CABA,BUENOS AIRES;220,MERLO,BUENOS AIRES;221,LA PLATA,BUENOS AIRES;223,MAR DEL PLATA,BUENOS AIRES;261,MENDOZA,MENDOZA;264,SAN JUAN,SAN JUAN;266,SAN LUIS,SAN LUIS;280,TRELEW,CHUBUT;291,BAHIA BLANCA,BUENOS AIRES;294,BARILOCHE,RIO NEGRO;297,COMODORO RIVADAVIA,CHUBUT;299,NEUQUEN,NEUQUEN;341,ROSARIO,SANTA FE;342,SANTA FE,SANTA FE;343,PARANA,ENTRE RIOS;351,CORDOBA,CORDOBA;362,RESISTENCIA,CHACO;370,FORMOSA,FORMOSA;376,POSADAS,MISIONES;379,CORRIENTES,CORRIENTES;380,LA RIOJA,LA RIOJA;381,SAN MIGUEL DE TUCUMAN,TUCUMAN;383,CATAMARCA,CATAMARCA;385,SANTIAGO DEL ESTERO,SANTIAGO DEL ESTERO;387,SALTA,SALTA;388,SAN SALVADOR DE JUJUY,JUJUY`; // Versión resumida de tu base de datos para no saturar el archivo, aunque internamente puedes pegar tu RAW completo.
+        <div id="panel-smart">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <p class="text-[10px] uppercase tracking-[.16em] font-extrabold text-slate-400">Ingreso inteligente</p>
+              <h2 id="status-text" class="font-bold text-sm mt-1">Pegá texto o una captura</h2>
+            </div>
+            <div id="status-icon" class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center"><i data-feather="cpu" class="w-4 h-4"></i></div>
+          </div>
 
-        let PrefixMap = {};
-        let rows = [];
-        let isProcessing = false;
+          <div id="drop-zone" class="drop-zone soft-grid relative rounded-3xl border-2 border-dashed border-slate-300 bg-slate-50/75 min-h-[260px] p-5 flex flex-col items-center justify-center text-center cursor-text overflow-hidden">
+            <textarea id="paste-input" class="absolute inset-0 w-full h-full resize-none bg-transparent outline-none text-transparent caret-slate-700 p-5 z-10" aria-label="Pegar texto o captura"></textarea>
+            <div id="paste-placeholder" class="pointer-events-none relative z-0">
+              <div class="w-16 h-16 mx-auto rounded-3xl bg-white border border-slate-200 shadow-sm flex items-center justify-center mb-4">
+                <i data-feather="clipboard" class="w-7 h-7 text-indigo-500"></i>
+              </div>
+              <p class="text-sm font-extrabold text-slate-700">CTRL + V para pegar</p>
+              <p class="text-xs text-slate-500 mt-1 max-w-[280px]">Reconoce texto copiado, perfiles de WhatsApp, correos y capturas desde el portapapeles.</p>
+              <div class="mt-4 flex items-center justify-center gap-2 flex-wrap">
+                <span class="text-[10px] font-bold bg-white border border-slate-200 rounded-full px-2.5 py-1">Nombre</span>
+                <span class="text-[10px] font-bold bg-white border border-slate-200 rounded-full px-2.5 py-1">Teléfono</span>
+                <span class="text-[10px] font-bold bg-white border border-slate-200 rounded-full px-2.5 py-1">Correo</span>
+                <span class="text-[10px] font-bold bg-white border border-slate-200 rounded-full px-2.5 py-1">Carrera</span>
+                <span class="text-[10px] font-bold bg-white border border-slate-200 rounded-full px-2.5 py-1">Fuente</span>
+              </div>
+            </div>
+          </div>
 
-        document.addEventListener('DOMContentLoaded', () => {
-            initPrefixMap();
-            feather.replace();
-            renderLegend();
-            populateManualSelect();
-            setupPasteListener();
-        });
+          <div class="grid grid-cols-2 gap-2 mt-3">
+            <label class="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3 py-2.5 text-xs font-bold text-slate-700 flex items-center justify-center gap-2 cursor-pointer">
+              <i data-feather="image" class="w-4 h-4"></i> Subir captura
+              <input id="image-input" type="file" accept="image/*" class="hidden" />
+            </label>
+            <button onclick="analyzeTypedText()" class="rounded-xl bg-indigo-600 hover:bg-indigo-500 px-3 py-2.5 text-xs font-bold text-white flex items-center justify-center gap-2">
+              <i data-feather="search" class="w-4 h-4"></i> Analizar texto
+            </button>
+          </div>
+          <p class="text-[10px] leading-4 text-slate-400 mt-3">Tip: también podés arrastrar una imagen sobre el recuadro. La extracción se ejecuta localmente en el navegador.</p>
+        </div>
 
-        function initPrefixMap() {
-            const lines = RAW_PREFIX_DATA.split(';');
-            lines.forEach(line => {
-                const parts = line.split(',');
-                if (parts.length >= 3) {
-                    const code = parts[0].trim();
-                    const city = parts[1].trim();
-                    const prov = parts[2].trim();
-                    if (!PrefixMap[code]) PrefixMap[code] = { cities: new Set(), province: prov };
-                    PrefixMap[code].cities.add(city);
-                }
-            });
+        <div id="panel-manual" class="hidden space-y-3">
+          <div>
+            <label class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Nombre completo</label>
+            <input id="manual-nombre" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400" placeholder="Ej. Juan Pérez">
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Teléfono</label>
+              <input id="manual-telefono" oninput="handleManualPhoneInput(this)" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none" placeholder="351...">
+            </div>
+            <div>
+              <label class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Correo</label>
+              <input id="manual-email" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none" placeholder="correo@...">
+            </div>
+          </div>
+          <div>
+            <label class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Provincia</label>
+            <input id="manual-provincia" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none" placeholder="Se detecta por característica">
+          </div>
+          <div>
+            <label class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Carrera</label>
+            <select id="manual-carrera" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none"><option value="">-- Seleccionar --</option></select>
+          </div>
+          <div>
+            <label class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Fuente</label>
+            <select id="manual-fuente" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none"><option>WhatsApp Comercial</option><option>Correo</option><option>Facebook / Instagram</option><option>Web</option><option>Otro</option></select>
+          </div>
+          <div>
+            <label class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Observaciones</label>
+            <textarea id="manual-obs" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none resize-none h-20" placeholder="Nota opcional"></textarea>
+          </div>
+          <button onclick="processManualEntry()" class="w-full bg-slate-950 hover:bg-slate-800 text-white rounded-xl py-3 text-xs font-bold flex items-center justify-center gap-2"><i data-feather="plus" class="w-4 h-4"></i> Agregar lead</button>
+        </div>
+      </section>
+
+      <section class="glass rounded-[28px] p-5">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <p class="text-[10px] uppercase tracking-[.16em] font-extrabold text-slate-400">Mapa de carreras</p>
+            <h3 class="text-sm font-bold mt-1">Colores y asociaciones</h3>
+          </div>
+          <span class="text-[10px] text-slate-400">colores originales</span>
+        </div>
+        <div id="legend-container" class="grid grid-cols-1 md:grid-cols-2 gap-2"></div>
+      </section>
+    </aside>
+
+    <main class="xl:col-span-8">
+      <section class="glass rounded-[28px] overflow-hidden flex flex-col">
+        <div class="sticky-header bg-white/80 backdrop-blur px-5 md:px-6 py-4 border-b border-slate-200">
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center"><i data-feather="users" class="w-4 h-4 text-slate-600"></i></div>
+              <div>
+                <p class="font-extrabold text-base">Leads extraídos</p>
+                <p class="text-[12px] text-slate-500">Vista completa, editable y lista para exportar al CRM</p>
+                <div class="flex flex-wrap gap-1.5 mt-2 text-[9px] font-bold">
+                  <span class="bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full px-2 py-1" title="Coincidencia explícita o muy clara">Alta = detectado con mucha seguridad</span>
+                  <span class="bg-amber-50 text-amber-700 border border-amber-100 rounded-full px-2 py-1" title="Dato inferido por contexto o perfil">Media = probable por contexto</span>
+                  <span class="bg-orange-50 text-orange-700 border border-orange-100 rounded-full px-2 py-1" title="Inferencia débil">Revisar = conviene verificar</span>
+                </div>
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-full px-3 py-1.5"><span id="row-count">0</span> registro(s)</div>
+              <div class="text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full px-3 py-1.5">Editable antes de exportar</div>
+              <button onclick="clearAll()" class="text-xs font-bold text-slate-500 hover:text-red-600 px-3 py-2">Limpiar</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="lead-list no-scrollbar p-4 md:p-5 bg-slate-50/40">
+          <div id="table-body" class="space-y-4"></div>
+          <div id="empty-state" class="min-h-[520px] flex flex-col items-center justify-center text-center px-6 rounded-[24px] bg-white/65 border border-dashed border-slate-200">
+            <div class="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4"><i data-feather="inbox" class="w-7 h-7 text-slate-300"></i></div>
+            <h3 class="font-bold text-slate-600">Todavía no hay leads</h3>
+            <p class="text-xs text-slate-400 mt-1 max-w-sm">Pegá una conversación, un correo o una captura. Vas a ver cada lead completo, con todos sus datos visibles y editables antes de copiarlo o exportarlo.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div id="toast" class="fixed bottom-5 right-5 translate-y-24 opacity-0 transition-all duration-300 z-50 bg-slate-950 text-white rounded-2xl shadow-2xl px-4 py-3 flex items-center gap-3 text-xs font-bold max-w-sm">
+  <span id="toast-icon"></span><span id="toast-message">Listo</span>
+</div>
+
+<script>
+const CareerMapper = {
+  1: {
+    label: 'Desarrollo web', short: 'DW', color: '#b8a68e',
+    exact: ['desarrollo web','desarrollo de web','desarrollador web','programacion web','programación web','diseño web','diseno web'],
+    codes: ['dw','dw-s','dw s'],
+    keywords: ['frontend','backend','full stack','html','css','javascript','js','react','sitios web','paginas web','páginas web','ux ui','ui ux']
+  },
+  2: {
+    label: 'Administración de empresas', short: 'AE', color: '#859f4f',
+    exact: ['administracion de empresas','administración de empresas','admin de empresas','gestion empresarial','gestión empresarial','administracion empresarial'],
+    codes: ['ae','ae-s','ae s'],
+    keywords: ['negocios','management','emprendimientos','emprendedor','empresa','contabilidad basica','contabilidad básica','administracion']
+  },
+  3: {
+    label: 'Marketing', short: 'MKT', color: '#ff7b1c',
+    exact: ['marketing','marketing digital','comercializacion','comercialización'],
+    codes: ['mkt','mkt-s','mkt s'],
+    keywords: ['mercadeo','publicidad','redes sociales','community manager','community','branding','social media','contenido digital','ventas digitales']
+  },
+  4: {
+    label: 'Higiene y seguridad', short: 'HS', color: '#fbc42b',
+    exact: ['higiene y seguridad','higiene & seguridad','seguridad e higiene','tecnico en higiene y seguridad','técnico en higiene y seguridad'],
+    codes: ['hs','hys','h&s','hyS','hs-s','hs s'],
+    keywords: ['prevencion de riesgos','prevención de riesgos','seguridad laboral','salud ocupacional','riesgos laborales']
+  },
+  5: {
+    label: 'Gestión inmobiliaria', short: 'GI', color: '#be2528',
+    exact: ['gestion inmobiliaria','gestión inmobiliaria','corredor inmobiliario','martillero','martillero publico','martillero público','real estate','bienes raices','bienes raíces'],
+    codes: ['gi','gi-s','gi s'],
+    keywords: ['inmobiliaria','tasacion','tasación','propiedades','negocios inmobiliarios','derecho inmobiliario','juridico','jurídico','legal','contratos','abogacia','abogacía','derecho','escribania','escribanía','notarial']
+  },
+  6: {
+    label: 'Analista de sistemas', short: 'AS', color: '#00adef',
+    exact: ['analista de sistemas','analista sistemas','sistemas informaticos','sistemas informáticos'],
+    codes: ['as','asc','as-s','as s'],
+    keywords: ['sistemas','informatica','informática','software','base de datos','sql','analista programador','it']
+  },
+  7: {
+    label: 'Ciencia de datos e IA', short: 'IA', color: '#405ba8',
+    exact: ['ciencia de datos e ia','ciencia de datos','inteligencia artificial','data science','data scientist','ciencia de datos e inteligencia artificial','inteligencia artificial y ciencia de datos','artificial intelligence','data analytics','analitica de datos','analítica de datos'],
+    codes: ['ia','ia-hs','ia hs','cdia','ds','ai'],
+    keywords: ['machine learning','deep learning','big data','data analyst','analista de datos','datos','automatizacion inteligente','automatización inteligente','python para datos','ia generativa']
+  },
+  8: {
+    label: 'Recursos humanos', short: 'RRHH', color: '#c397c6',
+    exact: ['recursos humanos','gestion de recursos humanos','gestión de recursos humanos','capital humano','talento humano','gestion del talento','gestión del talento','relaciones laborales'],
+    codes: ['rrhh','rr hh','rh','rrhh-s','rrhh s'],
+    keywords: ['seleccion de personal','selección de personal','reclutamiento','recruiter','liquidacion de sueldos','liquidación de sueldos','personal','hr','human resources']
+  }
+};
+
+const RAW_PREFIX_DATA = `11,CABA,BUENOS AIRES;220,MERLO,BUENOS AIRES;221,LA PLATA,BUENOS AIRES;223,MAR DEL PLATA,BUENOS AIRES;261,MENDOZA,MENDOZA;264,SAN JUAN,SAN JUAN;266,SAN LUIS,SAN LUIS;280,TRELEW,CHUBUT;291,BAHIA BLANCA,BUENOS AIRES;294,BARILOCHE,RIO NEGRO;297,COMODORO RIVADAVIA,CHUBUT;299,NEUQUEN,NEUQUEN;341,ROSARIO,SANTA FE;342,SANTA FE,SANTA FE;343,PARANA,ENTRE RIOS;351,CORDOBA,CORDOBA;362,RESISTENCIA,CHACO;370,FORMOSA,FORMOSA;376,POSADAS,MISIONES;379,CORRIENTES,CORRIENTES;380,LA RIOJA,LA RIOJA;381,SAN MIGUEL DE TUCUMAN,TUCUMAN;383,CATAMARCA,CATAMARCA;385,SANTIAGO DEL ESTERO,SANTIAGO DEL ESTERO;387,SALTA,SALTA;388,SAN SALVADOR DE JUJUY,JUJUY`;
+let PrefixMap = {}, rows = [], isProcessing = false;
+
+const normalize = s => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[“”"']/g, '').replace(/\s+/g, ' ').trim();
+const titleCase = s => (s || '').trim().toLowerCase().replace(/(^|[\s'-])([a-záéíóúüñ])/g, (_, a, b) => a + b.toUpperCase());
+const escapeHtml = s => String(s ?? '').replace(/[&<>'"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[c]));
+const uniqueId = () => Date.now() + Math.floor(Math.random() * 10000);
+
+function initPrefixMap() {
+  RAW_PREFIX_DATA.split(';').forEach(line => {
+    const [code, city, province] = line.split(',');
+    if (!PrefixMap[code]) PrefixMap[code] = { cities: new Set(), province };
+    PrefixMap[code].cities.add(city);
+  });
+}
+
+function formatPhoneNumber(phone) {
+  const c = String(phone || '').replace(/\D/g, '');
+  if (c.length === 10) return `${c.slice(0,3)} ${c.slice(3,6)} ${c.slice(6)}`;
+  if (c.length === 13 && c.startsWith('549')) return `+54 9 ${c.slice(3,5)} ${c.slice(5,9)} ${c.slice(9)}`;
+  if (c.length === 12 && c.startsWith('54')) return `+54 ${c.slice(2,4)} ${c.slice(4,8)} ${c.slice(8)}`;
+  return c;
+}
+
+function detectProvince(phone) {
+  let c = String(phone || '').replace(/\D/g, '');
+  if (c.startsWith('549')) c = c.slice(3);
+  else if (c.startsWith('54')) c = c.slice(2);
+  if (c.startsWith('15')) c = c.slice(2);
+  for (let len = 4; len >= 2; len--) {
+    const p = c.slice(0, len);
+    if (PrefixMap[p]) return `${[...PrefixMap[p].cities][0]}, ${PrefixMap[p].province}`;
+  }
+  return '';
+}
+
+function validEmailFromText(text) {
+  const candidates = String(text || '').match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/ig) || [];
+  return candidates.map(x => x.replace(/[),.;:]+$/, '')).find(x => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(x)) || '';
+}
+
+function detectSource(text, email) {
+  const raw = String(text || '');
+  const n = normalize(raw);
+  const mailSignals = [/(^|\n)\s*(de|from)\s*:/i, /(^|\n)\s*(para|to)\s*:/i, /(^|\n)\s*(asunto|subject)\s*:/i, /enviado el|sent:/i, /responder|reply/i, /firma|signature/i];
+  const waSignals = [/whatsapp/i, /en linea|en línea/i, /últ\. vez|ult\. vez/i, /mensaje cifrado/i, /business/i, /escribiendo/i, /meta para administrar este chat/i, /cuenta de empresa/i];
+  if (mailSignals.filter(r => r.test(raw)).length >= 2 || (/asunto\s*:/i.test(raw) && email)) return 'Correo';
+  if (waSignals.some(r => r.test(raw))) return 'WhatsApp Comercial';
+  if (/instagram|facebook|meta lead|messenger/.test(n)) return 'Facebook / Instagram';
+  if (/formulario|landing|sitio web|pagina web|página web/.test(n)) return 'Web';
+  if (email && /estimad[oa]|buen(os|as) dias|saludos|atentamente/.test(n)) return 'Correo';
+  return 'WhatsApp Comercial';
+}
+
+function phraseRegex(phrase) {
+  const escaped = normalize(phrase).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, 'i');
+}
+
+function extractCareerFields(text) {
+  const raw = String(text || '');
+  const fields = [];
+  const expressions = [
+    /(?:carrera|tecnicatura|interes|interés|consulta|programa|quiero estudiar|me interesa|informacion sobre|información sobre)\s*(?:es\s*)?[:\-]\s*([^\n]{1,120})/ig
+  ];
+  expressions.forEach(rx => {
+    let m;
+    while ((m = rx.exec(raw)) !== null) {
+      const value = (m[1] || '').split(/\s{2,}|\|/)[0].trim();
+      if (value) fields.push(value);
+    }
+  });
+  return fields;
+}
+
+function detectCareer(text) {
+  const raw = String(text || '');
+  const n = normalize(raw).replace(/[|_/\\]+/g, ' ');
+  const fieldCandidates = extractCareerFields(raw).map(normalize);
+  let best = { id: '', score: 0, reasons: [] };
+
+  for (const [id, c] of Object.entries(CareerMapper)) {
+    let score = 0;
+    let reasons = [];
+
+    for (const code of c.codes) {
+      if (phraseRegex(code).test(n)) {
+        score += 16;
+        reasons.push(`Código ${code.toUpperCase()}`);
+      }
+    }
+    for (const exact of c.exact) {
+      if (n.includes(normalize(exact))) {
+        score += 12;
+        reasons.push(exact);
+      }
+    }
+    for (const kw of c.keywords) {
+      if (n.includes(normalize(kw))) {
+        score += 4;
+        reasons.push(kw);
+      }
+    }
+
+    fieldCandidates.forEach(field => {
+      for (const code of c.codes) {
+        if (phraseRegex(code).test(field)) {
+          score += 20;
+          reasons.push(`Campo: ${code.toUpperCase()}`);
         }
-
-        // --- Utilidades ---
-        function toTitleCase(str) {
-            if (!str) return '';
-            if (str === 'SIN NOMBRE') return str;
-            return str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+      }
+      for (const exact of c.exact) {
+        if (field.includes(normalize(exact))) {
+          score += 18;
+          reasons.push(`Campo: ${exact}`);
         }
-
-        function formatPhoneNumber(phone) {
-            if (!phone) return '';
-            const cleaned = ('' + phone).replace(/\D/g, '');
-            if (cleaned.length === 10) return `${cleaned.slice(0,3)} ${cleaned.slice(3,6)} ${cleaned.slice(6)}`;
-            return cleaned;
+      }
+      for (const kw of c.keywords) {
+        if (field.includes(normalize(kw))) {
+          score += 8;
+          reasons.push(`Campo: ${kw}`);
         }
+      }
+    });
 
-        function detectProvince(phone) {
-            if (!phone) return '';
-            let clean = phone.replace(/\D/g, '');
-            if (clean.startsWith('549')) clean = clean.substring(3);
-            else if (clean.startsWith('54')) clean = clean.substring(2);
-            else if (clean.startsWith('15')) clean = clean.substring(2);
+    if (score > best.score) best = { id, score, reasons: [...new Set(reasons)] };
+  }
 
-            for (let len = 4; len >= 2; len--) {
-                const sub = clean.substring(0, len);
-                if (PrefixMap[sub]) {
-                    const data = PrefixMap[sub];
-                    return `${Array.from(data.cities)[0]}, ${data.province}`;
-                }
-            }
-            return '';
-        }
+  return {
+    id: best.score >= 7 ? best.id : '',
+    confidence: best.score >= 26 ? 'alta' : best.score >= 14 ? 'media' : best.score >= 7 ? 'baja' : 'sin detectar',
+    reasons: best.reasons
+  };
+}
 
-        // --- MODO MANUAL ---
-        function handleManualPhoneInput(inputElement) {
-            let val = inputElement.value.replace(/\D/g, '');
-            // Formateo visual
-            if (val.length === 10) {
-                inputElement.value = `${val.slice(0,3)} ${val.slice(3,6)} ${val.slice(6)}`;
-            } else {
-                inputElement.value = val;
-            }
-            const detected = detectProvince(val);
-            if (detected) document.getElementById('manual-provincia').value = detected;
-        }
+function cleanupName(value) {
+  let s = String(value || '').replace(/[\[\]_*•|]/g, ' ').replace(/\s+/g, ' ').trim();
+  s = s.replace(/^[¡!¿?.,;:]+|[¡!¿?.,;:]+$/g, '').trim();
+  s = s.replace(/\b(whatsapp|business|contacto|perfil|nombre|apellido|cliente|lead|prospecto)\b\s*:?/ig, '').trim();
+  s = s.replace(/\s[-–—]\s.*$/, '').replace(/\([^)]*\)$/,'').trim();
+  if (/@|https?:|\d{3,}/.test(s)) return '';
+  const words = s.split(/\s+/).filter(Boolean);
+  if (words.length < 1 || words.length > 5) return '';
+  const blacklist = ['hola','hola cervantes','buen dia','buenas','consulta','informacion','información','mensaje','correo','email','cervantes','institucion cervantes','institución cervantes','administrador','notificaciones'];
+  if (blacklist.some(b => normalize(s) === normalize(b))) return '';
+  return titleCase(s);
+}
 
-        function switchTab(mode) {
-            const tS = document.getElementById('tab-smart'), tM = document.getElementById('tab-manual');
-            const pS = document.getElementById('panel-smart'), pM = document.getElementById('panel-manual');
-            
-            if (mode === 'smart') {
-                tS.className = 'tab-active flex-1 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-wider flex justify-center items-center gap-2 transition-all shadow-sm';
-                tM.className = 'tab-inactive flex-1 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-wider flex justify-center items-center gap-2 transition-all';
-                pS.classList.remove('hidden'); pM.classList.add('hidden');
-            } else {
-                tS.className = 'tab-inactive flex-1 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-wider flex justify-center items-center gap-2 transition-all';
-                tM.className = 'tab-active flex-1 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-wider flex justify-center items-center gap-2 transition-all shadow-sm';
-                pS.classList.add('hidden'); pM.classList.remove('hidden');
-            }
-        }
+function extractExplicitNameCandidates(text) {
+  const raw = String(text || '').replace(/\r/g, '\n');
+  const candidates = [];
 
-        function populateManualSelect() {
-            const select = document.getElementById('manual-carrera');
-            for (const [id, data] of Object.entries(CareerMapper)) {
-                const option = document.createElement('option');
-                option.value = id; option.textContent = data.label;
-                select.appendChild(option);
-            }
-        }
+  // OCR puede perder :, -, saltos de línea o duplicar espacios. Estas expresiones toleran eso.
+  const patterns = [
+    /(?:mi\s+)?nombre\s+completo\s*(?:es\s*)?[:\-]?\s*([A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]{2,80}?)(?=\s*(?:\n|mi\s+consulta|consulta|carrera|inter[eé]s|tel[eé]fono|celular|correo|email|mail|asunto|$))/ig,
+    /(?:mi\s+)?nombre\s+y\s+apellido\s*(?:es\s*)?[:\-]?\s*([A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]{2,80}?)(?=\s*(?:\n|mi\s+consulta|consulta|carrera|inter[eé]s|tel[eé]fono|celular|correo|email|mail|asunto|$))/ig,
+    /(?:^|\n|[.!?])\s*(?:mi\s+)?nombre(?!\s+completo\b|\s+y\s+apellido\b)\s*(?:es\s*)?[:\-]?\s*([A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]{2,80}?)(?=\s*(?:\n|mi\s+consulta|consulta|carrera|inter[eé]s|tel[eé]fono|celular|correo|email|mail|asunto|[.!?]|$))/ig,
+    /(?:^|\n|[.!?])\s*me\s+llamo\s*[:\-]?\s*([A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]{2,80}?)(?=\s*(?:\n|consulta|carrera|inter[eé]s|tel[eé]fono|celular|correo|email|mail|[.!?]|$))/ig,
+    /(?:^|\n|[.!?])\s*soy\s+([A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]{2,60}?)(?=\s*(?:\n|consulta|carrera|inter[eé]s|tel[eé]fono|celular|correo|email|mail|[.!?]|$))/ig,
+    /(?:nombre\s*del\s*(?:contacto|prospecto|lead|perfil)|perfil(?:\s*de\s*whatsapp)?|contacto(?:\s*de\s*whatsapp)?)\s*(?:es\s*)?[:\-]?\s*([^\n]{2,80})/ig,
+    /(?:^|\n)\s*(?:de|from)\s*:\s*([^<\n]+)(?:<[^>]+>)?/ig
+  ];
 
-        function processManualEntry() {
-            const nombre = document.getElementById('manual-nombre').value;
-            let telefono = document.getElementById('manual-telefono').value.replace(/\D/g, '');
-            const email = document.getElementById('manual-email').value;
-            
-            if (!nombre && !telefono && !email) return showToast('Ingresa al menos un dato', 'alert-circle');
+  for (const rx of patterns) {
+    let m;
+    while ((m = rx.exec(raw)) !== null) {
+      const v = cleanupName(m[1]);
+      if (v) candidates.push(v);
+    }
+  }
 
-            const data = {
-                id: Date.now(),
-                nombre: toTitleCase(nombre) || 'SIN NOMBRE',
-                telefono: telefono,
-                email: email || '',
-                tecnicaturaId: document.getElementById('manual-carrera').value || '',
-                provincia: document.getElementById('manual-provincia').value || '',
-                observaciones: document.getElementById('manual-obs').value || '',
-                fuente: 'WhatsApp Comercial',
-                estado: 'sin_contacto',
-                vendedorId: ''
-            };
+  // Variante sin delimitadores claros típica del OCR:
+  // "Mi nombre completo es Dante Mi consulta es data science"
+  const flattened = raw.replace(/\n+/g, ' ').replace(/\s+/g, ' ');
+  const flatPatterns = [
+    /mi\s+nombre\s+completo\s*(?:es\s*)?[:\-]?\s*([A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]{2,80}?)(?=\s+(?:mi\s+consulta|consulta|carrera|inter[eé]s|tel[eé]fono|celular|correo|email|mail|asunto)\b|$)/ig,
+    /mi\s+nombre(?!\s+completo\b|\s+y\s+apellido\b)\s*(?:es\s*)?[:\-]?\s*([A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]{2,80}?)(?=\s+(?:mi\s+consulta|consulta|carrera|inter[eé]s|tel[eé]fono|celular|correo|email|mail|asunto)\b|$)/ig,
+    /me\s+llamo\s*[:\-]?\s*([A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]{2,80}?)(?=\s+(?:consulta|carrera|inter[eé]s|tel[eé]fono|celular|correo|email|mail)\b|$)/ig
+  ];
+  for (const rx of flatPatterns) {
+    let m;
+    while ((m = rx.exec(flattened)) !== null) {
+      const v = cleanupName(m[1]);
+      if (v) candidates.push(v);
+    }
+  }
 
-            addRow(data);
-            showToast('Agregado manualmente', 'check-circle');
-            
-            ['nombre','telefono','email','provincia','carrera','obs'].forEach(f => document.getElementById(`manual-${f}`).value = '');
-        }
+  return [...new Set(candidates)];
+}
 
-        // --- LOGICA DE EXTRACCION INTELIGENTE (V4 ACTUALIZADA) ---
-        function parseTextToData(text) {
-            const lowerText = text.toLowerCase();
-            const normalizedText = lowerText.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+function detectName(text, email, source) {
+  const raw = String(text || '').replace(/\r/g, '');
 
-            // 1. Email (Agresivo: Siempre que haya un '@', lo captura)
-            let email = '';
-            // Busca cualquier cadena de texto (sin espacios) que contenga un '@'
-            const emailMatch = text.match(/\S*@\S*/);
-            
-            if (emailMatch) {
-                // Captura lo que tiene el @ y limpia comas, puntos o dos puntos del final
-                email = emailMatch[0].replace(/[,;:\.]$/, '').trim();
-            }
+  // PRIORIDAD MÁXIMA: líneas del tipo "Mi nombre completo es: Dante ©)".
+  // El OCR de WhatsApp suele agregar iconos, horas o símbolos al final; acá los descartamos.
+  const nameLines = raw.split('\n').map(x => x.trim()).filter(Boolean);
+  for (const line of nameLines) {
+    if (!/\bn[o0]m[b8]re\b/i.test(normalize(line))) continue;
+    const m = line.match(/n[o0]m[b8]re(?:\s+(?:completo|y\s+apellido))?\s*(?:es)?\s*[:;=\-]?\s*(.+)$/i);
+    if (!m) continue;
+    let tail = m[1]
+      .replace(/\b(?:mi\s+consulta|consulta|carrera|inter[eé]s|tel[eé]fono|celular|correo|email|mail|asunto)\b.*$/i, '')
+      .replace(/[©®™✓✔●•☺☻►▶◀◄@#_*|()[\]{}<>]+/g, ' ')
+      .replace(/\b\d{1,2}:\d{2}(?:\s*[ap]\.?\s*m\.?)?.*$/i, '')
+      .replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    // Toma nombre + apellido(s), hasta 5 palabras.
+    const words = tail.split(/\s+/).filter(Boolean).slice(0, 5);
+    const v = cleanupName(words.join(' '));
+    if (v) return { name: v, confidence: 'alta', reason: 'Nombre leído desde campo explícito' };
+  }
 
-            // 2. Teléfono
-            let validPhone = '';
-            const phones = text.match(/(\+?\d{1,3}[\s-]?9?[\s-]?\d{1,4}[\s-]?\d{2,4}[\s-]?\d{2,6})/g);
-            if (phones) {
-                const cleaned = phones.map(p => ({ org: p, val: p.replace(/\D/g, '') }));
-                const best = cleaned.find(p => p.val.startsWith('54')) || cleaned.sort((a,b) => b.val.length - a.val.length)[0];
-                validPhone = best ? best.val : '';
-            }
+  // 1) Todo nombre explícitamente declarado tiene prioridad absoluta.
+  const explicit = extractExplicitNameCandidates(raw);
+  if (explicit.length) {
+    // Si aparecen nombre y apellido en distintos candidatos, nos quedamos con el más completo.
+    const best = explicit.sort((a, b) => b.split(/\s+/).length - a.split(/\s+/).length || b.length - a.length)[0];
+    return { name: best, confidence: 'alta', reason: 'Nombre declarado explícitamente' };
+  }
 
-            // 3. Provincia
-            const provincia = detectProvince(validPhone);
+  // 2) Nombre y apellido en campos separados.
+  const nm = raw.match(/(?:^|\n)\s*nombres?\s*(?:es\s*)?[:\-]?\s*([^\n]+)/i);
+  const am = raw.match(/(?:^|\n)\s*apellidos?\s*(?:es\s*)?[:\-]?\s*([^\n]+)/i);
+  if (nm && am) {
+    const v = cleanupName(`${nm[1]} ${am[1]}`);
+    if (v) return { name: v, confidence: 'alta', reason: 'Nombre y apellido explícitos' };
+  }
 
-            // 4. Carrera
-            let bestId = '', maxScore = 0;
-            for (const [id, data] of Object.entries(CareerMapper)) {
-                let score = 0;
-                data.keywords.forEach(k => {
-                    const normK = k.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                    if (normalizedText.includes(normK)) score += k.length > 3 ? 2 : 1; 
-                });
-                if (score > maxScore) { maxScore = score; bestId = id; }
-            }
+  // 3) En WhatsApp, buscar primero el nombre visible del encabezado/perfil.
+  const lines = raw.split('\n').map(x => x.trim()).filter(Boolean);
+  const bad = /^(hoy|ayer|en linea|en línea|últ|ult\.|mensaje|cifrado|escribiendo|buscar|info|informacion|información|consulta|hola|buenas|asunto|para:|de:|from:|to:|mi consulta es|cuenta de empresa|se unió|se unio|bloquear|tu empresa usa|haz clic|servicio seguro)/i;
 
-            // 5. Nombre (Unificando Nombre y Apellido)
-            let likelyName = 'SIN NOMBRE';
-            
-            // a) Buscar campos de Nombre Completo explícitos
-            const fullNameMatch = text.match(/(?:nombre completo|nombre y apellido)\s*(?:\:|-)?\s*([^\n]+)/i);
-            
-            if (fullNameMatch) {
-                likelyName = fullNameMatch[1].replace(/[\*\_]/g, '').trim();
-            } else {
-                // b) Buscar Nombre y Apellido separados
-                const nameMatch = text.match(/(?:^|\n)\s*nombre(?:s)?\s*(?:\:|-)?\s*([^\n]+)/i);
-                const lastNameMatch = text.match(/(?:^|\n)\s*apellido(?:s)?\s*(?:\:|-)?\s*([^\n]+)/i);
-                
-                let n = nameMatch ? nameMatch[1].replace(/[\*\_]/g, '').trim() : '';
-                let a = lastNameMatch ? lastNameMatch[1].replace(/[\*\_]/g, '').trim() : '';
-                
-                if (n && a) {
-                    likelyName = `${n} ${a}`;
-                } else if (n) {
-                    likelyName = n;
-                } else if (a) {
-                    likelyName = a;
-                }
-            }
+  if (source === 'WhatsApp Comercial') {
+    // Primero buscamos una línea de nombre cercana a datos de perfil/chat.
+    for (const line of lines.slice(0, 14)) {
+      if (bad.test(line) || line.includes('@') || /\d{5,}/.test(line) || line.length > 55) continue;
+      const v = cleanupName(line);
+      if (v && v.split(' ').length <= 5) return { name: v, confidence: 'media', reason: 'Nombre visible en WhatsApp' };
+    }
+  }
 
-            // c) Respaldo tradicional
-            if (likelyName === 'SIN NOMBRE') {
-                const blackList = ['hola','interesa','quiero','info','precio','mensaje','cifrados','ayer','hoy','anuncio','facebook','cervantes','clic','error','foto','escribiendo','linea','bloquear','seguridad','contacto','perfil','cuenta','business', 'vez'];
-                
-                let clean = text.replace(email, '').replace(validPhone, ''); 
-                if (email) clean = clean.replace(email, '');
-                
-                const lines = text.split(/[\n]/).map(l => l.trim()).filter(l => l.length > 2);
-                
-                const candidate = lines.slice(0, 6).find(l => {
-                    const low = l.toLowerCase();
-                    const hasDigit = /\d/.test(l);
-                    const isBlacklisted = blackList.some(b => low.includes(b));
-                    const words = l.split(' ').length;
-                    return !hasDigit && !isBlacklisted && words <= 4 && !l.includes(':') && !l.includes('@');
-                });
+  // 4) Firma o remitente de correo.
+  if (source === 'Correo') {
+    for (const line of lines.slice(-12).reverse()) {
+      if (bad.test(line) || line.includes('@') || /\d{5,}/.test(line) || line.length > 55) continue;
+      const v = cleanupName(line);
+      if (v && v.split(' ').length >= 2) return { name: v, confidence: 'media', reason: 'Firma o remitente del correo' };
+    }
+  }
 
-                if (candidate) {
-                    const n = candidate.replace(/[^a-zA-Z\s\u00C0-\u00FF]/g, '').trim();
-                    if (n.length > 2) likelyName = n;
-                }
-            }
+  // 5) Como respaldo, derivar del email.
+  if (email) {
+    const local = email.split('@')[0].replace(/[._-]+/g, ' ').replace(/\d+/g, ' ').trim();
+    const v = cleanupName(local);
+    if (v && v.length > 3) return { name: v, confidence: 'baja', reason: 'Inferido desde el correo' };
+  }
 
-            likelyName = toTitleCase(likelyName);
+  return { name: 'SIN NOMBRE', confidence: 'sin detectar', reason: '' };
+}
 
-            // 6. Observaciones Extraídas
-            let observacionesList = [];
-            
-            const prefContactoMatch = text.match(/(?:prefiero que me contacten por|contacto preferido|preferencia de contacto|contactar por)\s*(?:\:|-)?\s*([^\n]+)/i);
-            if (prefContactoMatch) observacionesList.push(`Contacto: ${prefContactoMatch[1].replace(/[\*\_]/g, '').trim()}`);
-            
-            const horarioMatch = text.match(/(?:horario|disponibilidad|hora de contacto)\s*(?:\:|-)?\s*([^\n]+)/i);
-            if (horarioMatch) observacionesList.push(`Horario: ${horarioMatch[1].replace(/[\*\_]/g, '').trim()}`);
-            
-            const mensajeMatch = text.match(/(?:mensaje|consulta|comentarios?|observaciones?|nota)\s*(?:\:|-)?\s*([^\n]+)/i);
-            if (mensajeMatch) observacionesList.push(`Nota: ${mensajeMatch[1].replace(/[\*\_]/g, '').trim()}`);
+function detectPhone(text) {
+  const raw = String(text || '');
+  const matches = raw.match(/(?:\+?54\s*9?\s*)?(?:\(?\d{2,4}\)?[\s.-]*)?(?:15[\s.-]*)?\d{3,4}[\s.-]*\d{3,4}/g) || [];
+  const cleaned = matches.map(m => m.replace(/\D/g, '')).filter(v => v.length >= 10 && v.length <= 13);
+  const preferred = cleaned.find(v => v.startsWith('549')) || cleaned.find(v => v.startsWith('54')) || cleaned.find(v => v.length === 10) || cleaned[0] || '';
+  return preferred;
+}
 
-            return {
-                id: Date.now(),
-                nombre: likelyName,
-                telefono: validPhone,
-                email: email,
-                tecnicaturaId: bestId,
-                provincia: provincia,
-                observaciones: observacionesList.join(' | '), 
-                fuente: 'WhatsApp Comercial',
-                estado: 'sin_contacto',
-                vendedorId: ''
-            };
-        }
+function extractObservations(text) {
+  const out = [];
+  const defs = [
+    ['Contacto', /(?:prefiero que me contacten por|contacto preferido|preferencia de contacto|contactar por)\s*[:\-]\s*([^\n]+)/i],
+    ['Horario', /(?:horario|disponibilidad|hora de contacto)\s*[:\-]\s*([^\n]+)/i],
+    ['Nota', /(?:mensaje|consulta|comentarios?|observaciones?|nota)\s*[:\-]\s*([^\n]+)/i]
+  ];
+  defs.forEach(([k, r]) => {
+    const m = String(text || '').match(r);
+    if (m && m[1].trim().length < 180) out.push(`${k}: ${m[1].replace(/[_*]/g, '').trim()}`);
+  });
+  return out.join(' | ');
+}
 
-        function setupPasteListener() {
-            const input = document.getElementById('paste-input');
-            const dropZone = document.getElementById('drop-zone');
+function detectSourceConfidence(text, source, email) {
+  const raw = String(text || '');
+  const strongWhatsapp = /whatsapp|cuenta de empresa|meta para administrar este chat|mensaje cifrado|en linea|en línea|últ\. vez|escribiendo/i.test(raw);
+  const strongMail = /(^|\n)\s*(de|from|para|to|asunto|subject)\s*:/im.test(raw) || /enviado el|sent:/i.test(raw);
+  if (source === 'WhatsApp Comercial' && strongWhatsapp) return 'alta';
+  if (source === 'Correo' && (strongMail || email)) return 'alta';
+  if (source === 'Facebook / Instagram' || source === 'Web') return 'alta';
+  return source ? 'media' : 'baja';
+}
 
-            dropZone.addEventListener('click', () => input.focus());
+function parseTextToData(text) {
+  const email = validEmailFromText(text);
+  const telefono = detectPhone(text);
+  const fuente = detectSource(text, email);
+  const career = detectCareer(text);
+  const person = detectName(text, email, fuente);
+  return {
+    id: uniqueId(),
+    nombre: person.name,
+    telefono,
+    email,
+    tecnicaturaId: career.id,
+    provincia: detectProvince(telefono),
+    observaciones: extractObservations(text),
+    fuente,
+    estado: 'sin_contacto',
+    vendedorId: '',
+    meta: {
+      nameConfidence: person.confidence,
+      nameReason: person.reason,
+      careerConfidence: career.confidence,
+      careerReasons: career.reasons,
+      sourceConfidence: detectSourceConfidence(text, fuente, email)
+    }
+  };
+}
 
-            input.addEventListener('paste', async (e) => {
-                e.stopPropagation(); e.preventDefault();
-                const items = e.clipboardData.items;
-                let imageFound = false;
+function switchTab(mode) {
+  const smart = mode === 'smart';
+  document.getElementById('panel-smart').classList.toggle('hidden', !smart);
+  document.getElementById('panel-manual').classList.toggle('hidden', smart);
+  document.getElementById('tab-smart').classList.toggle('active', smart);
+  document.getElementById('tab-manual').classList.toggle('active', !smart);
+}
 
-                for (let i = 0; i < items.length; i++) {
-                    if (items[i].type.indexOf('image') !== -1) {
-                        const blob = items[i].getAsFile();
-                        processImage(blob);
-                        imageFound = true; break;
-                    }
-                }
+function populateManualSelect() {
+  const s = document.getElementById('manual-carrera');
+  Object.entries(CareerMapper).forEach(([id, c]) => {
+    s.insertAdjacentHTML('beforeend', `<option value="${id}">${c.label} (${c.short})</option>`);
+  });
+}
 
-                if (!imageFound) {
-                    const text = e.clipboardData.getData('text');
-                    if (text) {
-                        const data = parseTextToData(text);
-                        addRow(data);
-                        showToast('Datos extraídos', 'check-circle');
-                    }
-                }
-                input.value = ''; 
-            });
-        }
+function handleManualPhoneInput(el) {
+  const v = el.value.replace(/\D/g, '');
+  el.value = formatPhoneNumber(v);
+  const d = detectProvince(v);
+  if (d) document.getElementById('manual-provincia').value = d;
+}
 
-        async function processImage(blob) {
-            setLoading(true);
-            try {
-                if (!window.Tesseract) throw new Error("OCR no cargado");
-                const result = await Tesseract.recognize(blob, 'spa');
-                const data = parseTextToData(result.data.text);
-                addRow(data);
-                showToast('Imagen analizada', 'check-circle');
-            } catch (err) {
-                console.error(err);
-                showToast('Error al leer imagen', 'alert-triangle');
-            } finally {
-                setLoading(false);
-            }
-        }
+function processManualEntry() {
+  const nombre = document.getElementById('manual-nombre').value.trim();
+  const telefono = document.getElementById('manual-telefono').value.replace(/\D/g, '');
+  const email = document.getElementById('manual-email').value.trim();
+  if (!nombre && !telefono && !email) return showToast('Ingresá al menos un dato', 'alert-circle');
 
-        // --- UI Y TABLA ---
-        function addRow(data) {
-            rows.unshift(data);
-            renderTable();
-        }
+  addRow({
+    id: uniqueId(),
+    nombre: titleCase(nombre) || 'SIN NOMBRE',
+    telefono,
+    email,
+    tecnicaturaId: document.getElementById('manual-carrera').value,
+    provincia: document.getElementById('manual-provincia').value,
+    observaciones: document.getElementById('manual-obs').value,
+    fuente: document.getElementById('manual-fuente').value,
+    estado: 'sin_contacto',
+    vendedorId: '',
+    meta: { nameConfidence: 'alta', careerConfidence: 'alta', careerReasons: [], sourceConfidence: 'alta' }
+  });
 
-        function updateRow(id, field, value) {
-            const row = rows.find(r => r.id === id);
-            if (row) {
-                if (field === 'nombre') value = toTitleCase(value);
-                if (field === 'telefono') {
-                    value = value.replace(/\D/g, ''); 
-                    row.provincia = detectProvince(value);
-                }
-                row[field] = value;
-                renderTable(); 
-            }
-        }
+  ['nombre','telefono','email','provincia','carrera','obs'].forEach(k => document.getElementById(`manual-${k}`).value = '');
+  showToast('Lead agregado', 'check-circle');
+}
 
-        function deleteRow(id) {
-            rows = rows.filter(r => r.id !== id);
-            renderTable();
-        }
+function setupInput() {
+  const input = document.getElementById('paste-input');
+  const zone = document.getElementById('drop-zone');
+  const imageInput = document.getElementById('image-input');
 
-        function renderTable() {
-            const tbody = document.getElementById('table-body');
-            const emptyState = document.getElementById('empty-state');
-            document.getElementById('row-count').textContent = rows.length;
-            tbody.innerHTML = '';
+  zone.addEventListener('click', () => input.focus());
+  input.addEventListener('input', () => document.getElementById('paste-placeholder').style.opacity = input.value.trim() ? '0' : '1');
+  input.addEventListener('paste', e => {
+    const items = [...e.clipboardData.items];
+    const image = items.find(i => i.type.startsWith('image/'));
+    if (image) {
+      e.preventDefault();
+      processImage(image.getAsFile());
+      return;
+    }
+    setTimeout(() => {
+      if (input.value.trim()) analyzeTypedText();
+    }, 40);
+  });
 
-            if (rows.length === 0) { emptyState.style.display = 'flex'; return; }
-            emptyState.style.display = 'none';
+  imageInput.addEventListener('change', e => {
+    const f = e.target.files?.[0];
+    if (f) processImage(f);
+    e.target.value = '';
+  });
 
-            rows.forEach(row => {
-                const tr = document.createElement('tr');
-                tr.className = 'group hover:bg-slate-50/80 transition-colors fade-in';
-                const careerColor = CareerMapper[row.tecnicaturaId]?.color || '#cbd5e1';
-                
-                let optionsHtml = '<option value="">-- Sin asignar --</option>';
-                for (const [id, data] of Object.entries(CareerMapper)) {
-                    optionsHtml += `<option value="${id}" ${row.tecnicaturaId == id ? 'selected' : ''}>${data.label}</option>`;
-                }
+  ['dragenter','dragover'].forEach(evt => zone.addEventListener(evt, e => {
+    e.preventDefault();
+    zone.classList.add('dragging');
+  }));
+  ['dragleave','drop'].forEach(evt => zone.addEventListener(evt, e => {
+    e.preventDefault();
+    zone.classList.remove('dragging');
+  }));
+  zone.addEventListener('drop', e => {
+    const f = [...e.dataTransfer.files].find(x => x.type.startsWith('image/'));
+    if (f) processImage(f);
+  });
+}
 
-                tr.innerHTML = `
-                    <td class="px-6 py-4 align-top">
-                        <input onchange="updateRow(${row.id}, 'nombre', this.value)"
-                                class="invisible-input font-bold text-sm w-full px-2 py-1 ${row.nombre === 'SIN NOMBRE' ? 'text-slate-400 italic' : 'text-slate-800'}"
-                                value="${row.nombre}">
-                        <div class="flex items-center gap-1 mt-1 px-2">
-                            <i data-feather="mail" class="w-3 h-3 text-slate-400"></i>
-                            <input onchange="updateRow(${row.id}, 'email', this.value)"
-                                    class="invisible-input text-[11px] font-medium text-slate-500 w-full"
-                                    value="${row.email}" placeholder="Sin Email">
-                        </div>
-                    </td>
-                    <td class="px-6 py-4 align-top space-y-2">
-                        <div class="flex items-center gap-2 text-indigo-700 font-mono font-bold text-xs bg-indigo-50 px-2 py-1.5 rounded-lg w-fit border border-indigo-100">
-                            <i data-feather="smartphone" class="w-3.5 h-3.5 opacity-70"></i>
-                            <input onchange="updateRow(${row.id}, 'telefono', this.value)"
-                                    class="bg-transparent w-28 focus:outline-none"
-                                    value="${formatPhoneNumber(row.telefono)}">
-                        </div>
-                        <div class="flex items-center gap-1 px-1">
-                            <i data-feather="map-pin" class="w-3 h-3 text-slate-400"></i>
-                            <input onchange="updateRow(${row.id}, 'provincia', this.value)"
-                               class="invisible-input text-[11px] font-medium text-slate-500 w-full placeholder-slate-300"
-                               value="${row.provincia}" placeholder="Provincia...">
-                        </div>
-                    </td>
-                    <td class="px-6 py-4 align-top space-y-2">
-                        <div class="flex items-center gap-2 bg-white px-2 py-1 rounded-lg border border-slate-200 shadow-sm w-fit">
-                            <div class="w-2.5 h-2.5 rounded-full shadow-inner" style="background-color: ${careerColor}"></div>
-                            <select onchange="updateRow(${row.id}, 'tecnicaturaId', this.value)"
-                                     class="font-bold bg-transparent text-[11px] uppercase cursor-pointer focus:outline-none w-40 text-slate-700">
-                                ${optionsHtml}
-                            </select>
-                        </div>
-                        <input onchange="updateRow(${row.id}, 'observaciones', this.value)"
-                               class="invisible-input text-xs text-slate-600 w-full px-2 py-1.5 bg-slate-50/50"
-                               value="${row.observaciones}" placeholder="+ Añadir observación...">
-                    </td>
-                    <td class="px-6 py-4 align-middle text-right">
-                        <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onclick="copyRowToWhatsApp(${row.id})" class="text-indigo-600 hover:text-white bg-indigo-50 hover:bg-indigo-500 p-2 rounded-lg transition-colors shadow-sm" title="Copiar Datos">
-                                <i data-feather="copy" class="w-4 h-4"></i>
-                            </button>
-                            <button onclick="deleteRow(${row.id})" class="text-slate-400 hover:text-white hover:bg-red-500 p-2 rounded-lg transition-colors" title="Eliminar">
-                                <i data-feather="trash-2" class="w-4 h-4"></i>
-                            </button>
-                        </div>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-            feather.replace();
-        }
+function analyzeTypedText() {
+  const input = document.getElementById('paste-input');
+  const text = input.value.trim();
+  if (!text) return showToast('Pegá o escribí contenido primero', 'alert-circle');
+  addRow(parseTextToData(text));
+  input.value = '';
+  document.getElementById('paste-placeholder').style.opacity = '1';
+  showToast('Lead extraído y clasificado', 'check-circle');
+}
 
-        // --- EXPORTACIÓN Y COPIADO ---
-        function copyToClipboard(text) {
-            const ta = document.createElement("textarea");
-            ta.value = text; ta.style.position = "fixed"; ta.style.left = "-9999px";
-            document.body.appendChild(ta); ta.focus(); ta.select();
-            try { const ok = document.execCommand('copy'); document.body.removeChild(ta); return ok; } 
-            catch (e) { document.body.removeChild(ta); return false; }
-        }
+async function processImage(blob) {
+  setLoading(true);
+  try {
+    if (!window.Tesseract) throw new Error('OCR no disponible');
+    const result = await Tesseract.recognize(blob, 'spa+eng', {
+      logger: m => {
+        if (m.status === 'recognizing text') document.getElementById('status-text').textContent = `Leyendo captura ${Math.round((m.progress || 0) * 100)}%`;
+      }
+    });
+    const txt = result?.data?.text?.trim();
+    if (!txt) throw new Error('Sin texto');
+    addRow(parseTextToData(txt));
+    showToast('Captura analizada', 'check-circle');
+  } catch (e) {
+    console.error(e);
+    showToast('No pude leer bien esa imagen', 'alert-triangle');
+  } finally {
+    setLoading(false);
+  }
+}
 
-        function copyRowToWhatsApp(id) {
-            const row = rows.find(r => r.id === id);
-            if (!row) return;
-            const text = `👤 Nombre: ${row.nombre}\n📱 Teléfono: ${row.telefono}\n📧 Correo: ${row.email}\n🎓 Carrera: ${CareerMapper[row.tecnicaturaId]?.label || 'S/D'}\n📝 Notas: ${row.observaciones}`;
-            if (copyToClipboard(text)) showToast('Datos copiados', 'check-circle');
-            else showToast('Error al copiar', 'alert-triangle');
-        }
+function setLoading(state) {
+  isProcessing = state;
+  const icon = document.getElementById('status-icon');
+  const label = document.getElementById('status-text');
+  if (state) {
+    icon.innerHTML = '<div class="loader"></div>';
+    label.textContent = 'Procesando captura...';
+  } else {
+    icon.innerHTML = '<i data-feather="cpu" class="w-4 h-4"></i>';
+    label.textContent = 'Pegá texto o una captura';
+    feather.replace();
+  }
+}
 
-        function renderLegend() {
-            const container = document.getElementById('legend-container');
-            let html = '';
-            for (const [id, data] of Object.entries(CareerMapper)) {
-                html += `<div class="flex items-center gap-2 text-[11px] text-slate-600 font-medium bg-white/50 px-2 py-1 rounded-md border border-slate-100">
-                            <span class="w-2.5 h-2.5 rounded-full shadow-inner" style="background-color: ${data.color}"></span>
-                            ${data.label.split(' ')[0]}
-                         </div>`;
-            }
-            container.innerHTML = html;
-        }
+function addRow(data) {
+  rows.unshift(data);
+  renderTable();
+}
 
-        function setLoading(state) {
-            isProcessing = state;
-            const dropZone = document.getElementById('drop-zone'), icon = document.getElementById('status-icon'), text = document.getElementById('status-text'), placeholder = document.getElementById('paste-placeholder');
-            
-            if (state) {
-                dropZone.classList.add('border-indigo-400', 'bg-indigo-50/80');
-                icon.innerHTML = '<div class="loader"></div>';
-                text.textContent = 'Procesando...';
-                placeholder.classList.add('opacity-0');
-            } else {
-                dropZone.classList.remove('border-indigo-400', 'bg-indigo-50/80');
-                icon.innerHTML = '<i data-feather="cpu" class="w-3.5 h-3.5 text-indigo-500"></i>';
-                text.textContent = 'Analizador Inteligente';
-                placeholder.classList.remove('opacity-0');
-                feather.replace();
-            }
-        }
+function updateRow(id, field, value) {
+  const r = rows.find(x => x.id === id);
+  if (!r) return;
+  if (field === 'nombre') value = titleCase(value);
+  if (field === 'telefono') {
+    value = value.replace(/\D/g, '');
+    r.provincia = detectProvince(value);
+  }
+  r[field] = value;
+  renderTable();
+}
 
-        function exportToExcel() {
-            if (rows.length === 0) return showToast('No hay datos', 'alert-circle');
-            showToast('Generando Excel...', 'loader');
-            
-            setTimeout(() => {
-                const dataToExport = rows.map(r => ({
-                    'Nombre Completo': r.nombre,
-                    'Teléfono': r.telefono,
-                    'Email': r.email,
-                    'Tecnicatura ID': r.tecnicaturaId,
-                    'Fuente': 'WhatsApp Comercial',
-                    'Provincia': r.provincia,
-                    'Estado': 'sin_contacto',
-                    'Observaciones': r.observaciones,
-                    'Vendedor ID': r.vendedorId || ''
-                }));
+function deleteRow(id) {
+  rows = rows.filter(r => r.id !== id);
+  renderTable();
+}
 
-                const ws = XLSX.utils.json_to_sheet(dataToExport);
-                const wb = XLSX.utils.book_new();
-                ws['!cols'] = [{wch: 25}, {wch: 15}, {wch: 25}, {wch: 15}, {wch: 20}, {wch: 20}, {wch: 15}, {wch: 30}, {wch: 15}];
-                XLSX.utils.book_append_sheet(wb, ws, "Leads");
-                XLSX.writeFile(wb, `Leads_WA_${new Date().toISOString().slice(0,10)}.xlsx`);
-                showToast('Descargado', 'check-circle');
-            }, 500);
-        }
+function clearAll() {
+  if (!rows.length) return;
+  rows = [];
+  renderTable();
+  showToast('Lista vaciada', 'trash-2');
+}
 
-        function copySummary() {
-            if (rows.length === 0) return showToast('Nada para copiar', 'alert-circle');
-            const text = rows.map(r => `${r.nombre}\t${r.telefono}\t${r.tecnicaturaId ? CareerMapper[r.tecnicaturaId].label : 'S/D'}`).join('\n');
-            if (copyToClipboard(text)) showToast('Copiado al portapapeles', 'copy');
-        }
+function confidenceBadge(value, kind = 'dato') {
+  const normalized = value === 'sin detectar' ? 'baja' : value === 'manual' ? 'alta' : (value || 'baja');
+  const map = {
+    alta: ['Alta', 'Dato detectado de forma directa o con una coincidencia muy clara.', 'text-emerald-600 bg-emerald-50 border-emerald-100'],
+    media: ['Media', 'Dato detectado por contexto o inferencia bastante probable.', 'text-amber-600 bg-amber-50 border-amber-100'],
+    baja: ['Baja', 'Dato débil, inferido o no detectado. Conviene revisarlo.', 'text-slate-400 bg-slate-50 border-slate-200']
+  };
+  const [t, desc, c] = map[normalized] || map.baja;
+  return `<span title="${escapeHtml(kind)}: ${escapeHtml(desc)}" class="cursor-help text-[8px] leading-none uppercase tracking-wider font-extrabold border rounded-full px-1.5 py-1 ${c}">${t}</span>`;
+}
 
-        function showToast(message, iconName = 'info') {
-            const toast = document.getElementById('toast'), icon = document.getElementById('toast-icon'), msg = document.getElementById('toast-message');
-            icon.innerHTML = `<i data-feather="${iconName}" class="w-4 h-4 text-indigo-400"></i>`;
-            msg.textContent = message;
-            feather.replace();
-            toast.classList.remove('translate-y-20');
-            setTimeout(() => toast.classList.add('translate-y-20'), 3000);
-        }
-    </script>
+function fieldConfidence(row, field) {
+  if (field === 'nombre') return row.meta?.nameConfidence || (row.nombre && row.nombre !== 'SIN NOMBRE' ? 'media' : 'baja');
+  if (field === 'telefono') return row.telefono && String(row.telefono).replace(/\D/g,'').length >= 10 ? 'alta' : 'baja';
+  if (field === 'email') return row.email && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(row.email) ? 'alta' : 'baja';
+  if (field === 'provincia') return row.provincia ? 'media' : 'baja';
+  if (field === 'carrera') return row.meta?.careerConfidence || (row.tecnicaturaId ? 'media' : 'baja');
+  if (field === 'fuente') return row.meta?.sourceConfidence || (row.fuente ? 'media' : 'baja');
+  if (field === 'observaciones') return row.observaciones ? 'alta' : 'baja';
+  return 'baja';
+}
+function renderTable() {
+  const list = document.getElementById('table-body');
+  const empty = document.getElementById('empty-state');
+  document.getElementById('row-count').textContent = rows.length;
+  list.innerHTML = '';
+  empty.style.display = rows.length ? 'none' : 'flex';
+
+  rows.forEach((r, idx) => {
+    const c = CareerMapper[r.tecnicaturaId];
+    const color = c?.color || '#cbd5e1';
+    let opts = '<option value="">Sin asignar</option>';
+    Object.entries(CareerMapper).forEach(([id, x]) => {
+      opts += `<option value="${id}" ${String(r.tecnicaturaId) === id ? 'selected' : ''}>${escapeHtml(x.label)} (${x.short})</option>`;
+    });
+
+    const card = document.createElement('div');
+    card.className = 'lead-card enter rounded-[24px] overflow-hidden';
+    card.innerHTML = `
+      <div class="h-1.5 w-full" style="background:${color}"></div>
+      <div class="p-4 md:p-5">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-[11px] font-extrabold tracking-[.16em] uppercase text-slate-400">Lead ${rows.length - idx}</span>
+          </div>
+          <div class="flex items-center gap-1 self-end md:self-auto">
+            <button onclick="copyRow(${r.id})" class="p-2 rounded-xl text-indigo-600 hover:bg-indigo-50 border border-transparent hover:border-indigo-100" title="Copiar"><i data-feather="copy" class="w-4 h-4"></i></button>
+            <button onclick="deleteRow(${r.id})" class="p-2 rounded-xl text-slate-400 hover:bg-red-50 hover:text-red-600 border border-transparent hover:border-red-100" title="Eliminar"><i data-feather="trash-2" class="w-4 h-4"></i></button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+          <div class="md:col-span-3 rounded-2xl bg-white border border-slate-200 p-3.5">
+            <div class="flex items-center justify-between gap-2 mb-2"><p class="text-[10px] uppercase tracking-[.14em] font-extrabold text-slate-400">Nombre</p>${confidenceBadge(fieldConfidence(r, 'nombre'), 'Nombre')}</div>
+            <input class="editable font-extrabold text-base w-full px-2 py-1.5 ${r.nombre === 'SIN NOMBRE' ? 'text-red-500 italic' : 'text-slate-800'}" value="${escapeHtml(r.nombre)}" onchange="updateRow(${r.id}, 'nombre', this.value)">
+            <div class="mt-2 flex items-center justify-between gap-2"><span class="text-[10px] text-slate-400 font-medium">Correo</span>${confidenceBadge(fieldConfidence(r, 'email'), 'Correo')}</div>
+            <div class="mt-2 flex items-center gap-2 rounded-xl bg-slate-50 border border-slate-100 px-2.5 py-2">
+              <i data-feather="mail" class="w-3.5 h-3.5 text-slate-400"></i>
+              <input class="editable w-full px-1 py-1 text-[12px] text-slate-600" placeholder="Sin correo" value="${escapeHtml(r.email)}" onchange="updateRow(${r.id}, 'email', this.value)">
+            </div>
+          </div>
+
+          <div class="md:col-span-3 rounded-2xl bg-white border border-slate-200 p-3.5">
+            <div class="flex items-center justify-between gap-2 mb-2"><p class="text-[10px] uppercase tracking-[.14em] font-extrabold text-slate-400">Teléfono</p>${confidenceBadge(fieldConfidence(r, 'telefono'), 'Teléfono')}</div>
+            <div class="rounded-xl bg-indigo-50 border border-indigo-100 px-2.5 py-2 flex items-center gap-2 text-indigo-700">
+              <i data-feather="smartphone" class="w-4 h-4"></i>
+              <input class="bg-transparent outline-none w-full font-mono text-sm font-bold" value="${escapeHtml(formatPhoneNumber(r.telefono))}" placeholder="Sin teléfono" onchange="updateRow(${r.id}, 'telefono', this.value)">
+            </div>
+            <div class="mt-2 flex items-center justify-between"><span class="text-[10px] text-slate-400 font-medium">Provincia</span>${confidenceBadge(fieldConfidence(r, 'provincia'), 'Provincia')}</div><div class="mt-1 flex items-center gap-2 rounded-xl bg-slate-50 border border-slate-100 px-2.5 py-2 text-slate-600">
+              <i data-feather="map-pin" class="w-3.5 h-3.5 text-slate-400"></i>
+              <input class="editable w-full px-1 py-1 text-[12px]" value="${escapeHtml(r.provincia)}" placeholder="Provincia" onchange="updateRow(${r.id}, 'provincia', this.value)">
+            </div>
+          </div>
+
+          <div class="md:col-span-3 rounded-2xl bg-white border border-slate-200 p-3.5">
+            <div class="flex items-center justify-between gap-2 mb-2"><p class="text-[10px] uppercase tracking-[.14em] font-extrabold text-slate-400">Carrera vinculada</p>${confidenceBadge(fieldConfidence(r, 'carrera'), 'Carrera')}</div>
+            <div class="flex items-center gap-2 mb-2">
+              <span class="w-3 h-3 rounded-full shrink-0" style="background:${color}"></span>
+              <span class="text-[11px] text-slate-500 font-bold">Color CRM de la carrera</span>
+            </div>
+            <select class="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold outline-none" onchange="updateRow(${r.id}, 'tecnicaturaId', this.value)">${opts}</select>
+          </div>
+
+          <div class="md:col-span-3 rounded-2xl bg-white border border-slate-200 p-3.5">
+            <div class="flex items-center justify-between gap-2 mb-2"><p class="text-[10px] uppercase tracking-[.14em] font-extrabold text-slate-400">Fuente</p>${confidenceBadge(fieldConfidence(r, 'fuente'), 'Fuente')}</div>
+            <select class="w-full text-[12px] font-bold rounded-xl px-3 py-2.5 border border-slate-200 bg-slate-50 outline-none mb-2" onchange="updateRow(${r.id}, 'fuente', this.value)">
+              ${['WhatsApp Comercial','Correo','Facebook / Instagram','Web','Otro'].map(x => `<option ${r.fuente === x ? 'selected' : ''}>${x}</option>`).join('')}
+            </select>
+            <div class="flex items-center justify-between gap-2 mt-2 mb-1"><span class="text-[10px] text-slate-400 font-medium">Observaciones</span>${confidenceBadge(fieldConfidence(r, 'observaciones'), 'Observaciones')}</div><textarea class="editable w-full rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5 text-[12px] text-slate-600 resize-none min-h-[90px]" placeholder="+ Observación" onchange="updateRow(${r.id}, 'observaciones', this.value)">${escapeHtml(r.observaciones)}</textarea>
+          </div>
+        </div>
+      </div>`;
+
+    list.appendChild(card);
+  });
+
+  feather.replace();
+}
+
+function renderLegend() {
+  const el = document.getElementById('legend-container');
+  el.innerHTML = Object.entries(CareerMapper).map(([id, c]) => `
+    <div class="rounded-2xl border border-slate-200 bg-white p-3 flex items-start gap-3">
+      <span class="w-3.5 h-3.5 rounded-full shrink-0 mt-1" style="background:${c.color}"></span>
+      <div class="min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+          <p class="text-[11px] font-extrabold text-slate-700">${c.label}</p>
+          <span class="text-[9px] text-slate-500 font-extrabold border border-slate-200 rounded-full px-2 py-0.5">${c.short}</span>
+        </div>
+        <p class="text-[10px] text-slate-400 mt-1 leading-4">Reconoce: ${(c.exact.slice(0,2).concat(c.codes.slice(0,2)).concat(c.keywords.slice(0,2))).join(' · ')}</p>
+      </div>
+    </div>
+  `).join('');
+}
+
+function copyToClipboard(text) {
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text);
+    return true;
+  }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  const ok = document.execCommand('copy');
+  ta.remove();
+  return ok;
+}
+
+function copyRow(id) {
+  const r = rows.find(x => x.id === id);
+  if (!r) return;
+  const text = `👤 Nombre: ${r.nombre}\n📱 Teléfono: ${r.telefono}\n📧 Correo: ${r.email}\n🎓 Carrera: ${CareerMapper[r.tecnicaturaId]?.label || 'S/D'}\n🔎 Fuente: ${r.fuente}\n📝 Notas: ${r.observaciones}`;
+  copyToClipboard(text);
+  showToast('Lead copiado', 'copy');
+}
+
+function copySummary() {
+  if (!rows.length) return showToast('No hay leads para copiar', 'alert-circle');
+  const text = rows.map(r => `${r.nombre}\t${r.telefono}\t${r.email}\t${CareerMapper[r.tecnicaturaId]?.label || 'S/D'}\t${r.fuente}`).join('\n');
+  copyToClipboard(text);
+  showToast('Todos los leads copiados', 'copy');
+}
+
+function exportToExcel() {
+  if (!rows.length) return showToast('No hay datos para exportar', 'alert-circle');
+  const data = rows.map(r => ({
+    'Nombre Completo': r.nombre,
+    'Teléfono': r.telefono,
+    'Email': r.email,
+    'Tecnicatura ID': r.tecnicaturaId,
+    'Carrera': CareerMapper[r.tecnicaturaId]?.label || '',
+    'Fuente': r.fuente,
+    'Provincia': r.provincia,
+    'Estado': 'sin_contacto',
+    'Observaciones': r.observaciones,
+    'Vendedor ID': r.vendedorId || ''
+  }));
+  const ws = XLSX.utils.json_to_sheet(data), wb = XLSX.utils.book_new();
+  ws['!cols'] = [{wch:26},{wch:17},{wch:28},{wch:14},{wch:28},{wch:22},{wch:22},{wch:16},{wch:40},{wch:16}];
+  XLSX.utils.book_append_sheet(wb, ws, 'Leads');
+  XLSX.writeFile(wb, `Leads_CRM_${new Date().toISOString().slice(0,10)}.xlsx`);
+  showToast('Excel generado', 'check-circle');
+}
+
+function showToast(message, iconName = 'info') {
+  const t = document.getElementById('toast');
+  const i = document.getElementById('toast-icon');
+  document.getElementById('toast-message').textContent = message;
+  i.innerHTML = `<i data-feather="${iconName}" class="w-4 h-4 text-indigo-300"></i>`;
+  feather.replace();
+  t.classList.remove('translate-y-24', 'opacity-0');
+  clearTimeout(window.__toast);
+  window.__toast = setTimeout(() => t.classList.add('translate-y-24', 'opacity-0'), 2600);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  initPrefixMap();
+  populateManualSelect();
+  renderLegend();
+  setupInput();
+  renderTable();
+  feather.replace();
+});
+</script>
 </body>
 </html>
