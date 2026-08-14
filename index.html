@@ -325,7 +325,7 @@ const CareerMapper = {
   }
 };
 
-const RAW_PREFIX_DATA = `11,CABA,BUENOS AIRES;220,MERLO,BUENOS AIRES;221,LA PLATA,BUENOS AIRES;223,MAR DEL PLATA,BUENOS AIRES;261,MENDOZA,MENDOZA;264,SAN JUAN,SAN JUAN;266,SAN LUIS,SAN LUIS;280,TRELEW,CHUBUT;291,BAHIA BLANCA,BUENOS AIRES;294,BARILOCHE,RIO NEGRO;297,COMODORO RIVADAVIA,CHUBUT;299,NEUQUEN,NEUQUEN;341,ROSARIO,SANTA FE;342,SANTA FE,SANTA FE;343,PARANA,ENTRE RIOS;351,CORDOBA,CORDOBA;362,RESISTENCIA,CHACO;370,FORMOSA,FORMOSA;376,POSADAS,MISIONES;379,CORRIENTES,CORRIENTES;380,LA RIOJA,LA RIOJA;381,SAN MIGUEL DE TUCUMAN,TUCUMAN;383,CATAMARCA,CATAMARCA;385,SANTIAGO DEL ESTERO,SANTIAGO DEL ESTERO;387,SALTA,SALTA;388,SAN SALVADOR DE JUJUY,JUJUY`;
+const RAW_PREFIX_DATA = `11,CABA,BUENOS AIRES;220,MERLO,BUENOS AIRES;221,LA PLATA,BUENOS AIRES;223,MAR DEL PLATA,BUENOS AIRES;261,MENDOZA,MENDOZA;264,SAN JUAN,SAN JUAN;266,SAN LUIS,SAN LUIS;280,TRELEW,CHUBUT;291,BAHIA BLANCA,BUENOS AIRES;294,BARILOCHE,RIO NEGRO;297,COMODORO RIVADAVIA,CHUBUT;299,NEUQUEN,NEUQUEN;341,ROSARIO,SANTA FE;342,SANTA FE,SANTA FE;343,PARANA,ENTRE RIOS;351,CORDOBA,CORDOBA;3541,VILLA CARLOS PAZ,CORDOBA;362,RESISTENCIA,CHACO;370,FORMOSA,FORMOSA;376,POSADAS,MISIONES;379,CORRIENTES,CORRIENTES;380,LA RIOJA,LA RIOJA;381,SAN MIGUEL DE TUCUMAN,TUCUMAN;383,CATAMARCA,CATAMARCA;385,SANTIAGO DEL ESTERO,SANTIAGO DEL ESTERO;387,SALTA,SALTA;388,SAN SALVADOR DE JUJUY,JUJUY`;
 let PrefixMap = {}, rows = [], isProcessing = false;
 
 const normalize = s => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[“”"']/g, '').replace(/\s+/g, ' ').trim();
@@ -341,11 +341,51 @@ function initPrefixMap() {
   });
 }
 
+function splitArgentineNationalNumber(national) {
+  const n = String(national || '').replace(/\D/g, '');
+  if (n.length !== 10) return { area: '', local: n };
+
+  // Primero usar la base de características cargada.
+  for (let len = 4; len >= 2; len--) {
+    const prefix = n.slice(0, len);
+    if (PrefixMap[prefix]) return { area: prefix, local: n.slice(len) };
+  }
+
+  // Respaldo razonable para las características más frecuentes.
+  if (n.startsWith('11')) return { area: '11', local: n.slice(2) };
+  return { area: n.slice(0, 3), local: n.slice(3) };
+}
+
+function formatLocalSubscriber(local) {
+  const l = String(local || '').replace(/\D/g, '');
+  if (l.length === 8) return `${l.slice(0,4)}-${l.slice(4)}`;
+  if (l.length === 7) return `${l.slice(0,3)}-${l.slice(3)}`;
+  if (l.length === 6) return `${l.slice(0,2)}-${l.slice(2)}`;
+  if (l.length > 4) return `${l.slice(0, l.length - 4)}-${l.slice(-4)}`;
+  return l;
+}
+
 function formatPhoneNumber(phone) {
   const c = String(phone || '').replace(/\D/g, '');
-  if (c.length === 10) return `${c.slice(0,3)} ${c.slice(3,6)} ${c.slice(6)}`;
-  if (c.length === 13 && c.startsWith('549')) return `+54 9 ${c.slice(3,5)} ${c.slice(5,9)} ${c.slice(9)}`;
-  if (c.length === 12 && c.startsWith('54')) return `+54 ${c.slice(2,4)} ${c.slice(4,8)} ${c.slice(8)}`;
+  let international = false;
+  let mobile9 = false;
+  let national = c;
+
+  if (c.startsWith('549') && c.length >= 13) {
+    international = true;
+    mobile9 = true;
+    national = c.slice(3, 13);
+  } else if (c.startsWith('54') && c.length >= 12) {
+    international = true;
+    national = c.slice(2, 12);
+  }
+
+  if (national.length === 10) {
+    const { area, local } = splitArgentineNationalNumber(national);
+    const formatted = `${area} ${formatLocalSubscriber(local)}`.trim();
+    if (international) return `+54${mobile9 ? ' 9' : ''} ${formatted}`;
+    return formatted;
+  }
   return c;
 }
 
@@ -586,12 +626,93 @@ function detectName(text, email, source) {
   return { name: 'SIN NOMBRE', confidence: 'sin detectar', reason: '' };
 }
 
+function normalizeArgentinePhoneDigits(digits) {
+  let d = String(digits || '').replace(/\D/g, '');
+  if (!d) return '';
+
+  // OCR puede duplicar el 0/15 o devolver formatos internacionales distintos.
+  // Conservamos +54 9 cuando está presente porque es la señal más confiable.
+  if (d.startsWith('00549')) d = d.slice(2);
+  else if (d.startsWith('0054')) d = d.slice(2);
+
+  // +54 9 + 10 dígitos nacionales = 13 dígitos totales.
+  if (d.startsWith('549') && d.length >= 13) return d.slice(0, 13);
+  if (d.startsWith('54') && d.length >= 12) return d.slice(0, 12);
+
+  // Número argentino nacional: característica + abonado = 10 dígitos.
+  if (d.length === 10) return d;
+
+  // Celular nacional escrito con 15: característica + 15 + abonado.
+  // Quitamos el 15 cuando el resultado deja 10 dígitos.
+  if (d.length === 12) {
+    for (let areaLen = 2; areaLen <= 4; areaLen++) {
+      if (d.slice(areaLen, areaLen + 2) === '15') {
+        const candidate = d.slice(0, areaLen) + d.slice(areaLen + 2);
+        if (candidate.length === 10) return candidate;
+      }
+    }
+  }
+
+  return '';
+}
+
 function detectPhone(text) {
-  const raw = String(text || '');
-  const matches = raw.match(/(?:\+?54\s*9?\s*)?(?:\(?\d{2,4}\)?[\s.-]*)?(?:15[\s.-]*)?\d{3,4}[\s.-]*\d{3,4}/g) || [];
-  const cleaned = matches.map(m => m.replace(/\D/g, '')).filter(v => v.length >= 10 && v.length <= 13);
-  const preferred = cleaned.find(v => v.startsWith('549')) || cleaned.find(v => v.startsWith('54')) || cleaned.find(v => v.length === 10) || cleaned[0] || '';
-  return preferred;
+  const raw = String(text || '')
+    .replace(/[–—−]/g, '-')
+    .replace(/\u00a0/g, ' ');
+
+  const candidates = [];
+  const addCandidate = (value, score, reason) => {
+    const digits = String(value || '').replace(/\D/g, '');
+    const normalized = normalizeArgentinePhoneDigits(digits);
+    if (!normalized) return;
+    if (/^(\d)\1{7,}$/.test(normalized)) return;
+    candidates.push({ value: normalized, score, reason, raw: value });
+  };
+
+  // 1) PRIORIDAD MÁXIMA: número internacional argentino.
+  // Tolera: +54 9 3541 24-3195, +54 9 11 2544-4983, +5493515437064, etc.
+  const intl = raw.match(/(?:\+|00)?\s*54\s*[-.]?\s*9?\s*(?:\(?\d{2,4}\)?)(?:[\s.\-]*\d{2,4}){2,4}/g) || [];
+  intl.forEach(v => addCandidate(v, 100, 'Formato internacional argentino'));
+
+  // 2) Líneas que parecen contener teléfono/celular/WhatsApp.
+  const phoneLines = raw.split(/\n/).filter(line =>
+    /tel[eé]fono|celular|m[oó]vil|whatsapp|contacto|\+?54\s*9/i.test(line)
+  );
+  phoneLines.forEach(line => {
+    const chunks = line.match(/(?:\+?\d[\d\s().\-]{8,}\d)/g) || [];
+    chunks.forEach(v => addCandidate(v, 90, 'Línea telefónica'));
+  });
+
+  // 3) Secuencias generales con 10 a 13 dígitos aunque estén partidas 2+4, 3+3, etc.
+  // Importante para OCR: 3541 24-3195 tiene un bloque de solo 2 dígitos.
+  const general = raw.match(/(?:\+?\d{1,3}[\s.\-]*)?(?:\(?\d{2,4}\)?[\s.\-]*){2,5}\d{2,4}/g) || [];
+  general.forEach(v => {
+    const digits = v.replace(/\D/g, '');
+    let score = 50;
+    if (digits.startsWith('549')) score += 35;
+    else if (digits.startsWith('54')) score += 25;
+    if (/\+\s*54/.test(v)) score += 10;
+    if (digits.length === 10 || digits.length === 12 || digits.length === 13) score += 10;
+    addCandidate(v, score, 'Secuencia numérica');
+  });
+
+  // 4) Último respaldo: agrupar dígitos de cada línea y validar longitud.
+  raw.split(/\n/).forEach(line => {
+    const digits = line.replace(/\D/g, '');
+    if (digits.length >= 10 && digits.length <= 13) {
+      let score = 35;
+      if (digits.startsWith('549')) score += 40;
+      else if (digits.startsWith('54')) score += 30;
+      addCandidate(digits, score, 'Dígitos agrupados por línea');
+    }
+  });
+
+  if (!candidates.length) return '';
+
+  // Evitar horarios/fechas y elegir el candidato telefónico más fuerte.
+  candidates.sort((a, b) => b.score - a.score || b.value.length - a.value.length);
+  return candidates[0].value;
 }
 
 function extractObservations(text) {
