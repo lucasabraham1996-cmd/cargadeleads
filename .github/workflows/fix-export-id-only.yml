@@ -1,0 +1,37 @@
+name: Ajustar exportacion solo ID carrera
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Corregir exportacion
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          s=re.sub(r"\n\s*const invalidCareer=rows\.filter\(.*?\n\s*\}\n", "\n", s, count=1, flags=re.S)
+          s=s.replace("    'Tecnicatura ID':Number(r.tecnicaturaId),\n    'Carrera':CareerMapper[String(r.tecnicaturaId)]?.label||'',", "    'Tecnicatura ID':r.tecnicaturaId?String(r.tecnicaturaId):'',")
+          s=re.sub(r"\n\s*const headers=Object\.keys\(data\[0\]\);.*?\n\s*\}\n", "\n", s, count=1, flags=re.S)
+          s=s.replace("ws['!cols']=[{wch:28},{wch:18},{wch:30},{wch:15},{wch:30},{wch:22},{wch:24},{wch:18},{wch:42}];", "ws['!cols']=[{wch:28},{wch:18},{wch:30},{wch:15},{wch:22},{wch:24},{wch:18},{wch:42}];")
+          s=s.replace("toast(`Excel generado: ${data.length} lead(s) validados para CRM`)", "toast(`Excel generado: ${data.length} lead(s) para CRM`)")
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet && exit 0
+          git commit -m "Exporta solo Tecnicatura ID y permite carrera vacía"
+          git push
