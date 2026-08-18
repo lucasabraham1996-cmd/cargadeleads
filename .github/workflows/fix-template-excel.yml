@@ -1,0 +1,38 @@
+name: Ajustar Excel a plantilla CRM
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ajustar exportación
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          new=r'''function crmSource(v){const m={'WhatsApp Comercial':'whatsapp','Correo':'correo','Facebook / Instagram':'redes','Web':'web','Otro':'otro'};return m[v]||String(v||'').toLowerCase()}
+function exportExcel(){if(!rows.length)return toast('No hay datos');const headers=['Nombre Completo','Teléfono','Email','Tecnicatura ID','Fuente','Provincia','Estado','Observaciones','Vendedor ID'];const data=rows.map(r=>[String(r.nombre||''),String(r.telefono||''),String(r.email||''),r.tecnicaturaId?String(r.tecnicaturaId):'',crmSource(r.fuente),String(r.provincia||''),'sin_contacto',String(r.observaciones||''),'']);const ws=XLSX.utils.aoa_to_sheet([headers,...data]);ws['!cols']=[{wch:26},{wch:18},{wch:30},{wch:15},{wch:14},{wch:24},{wch:16},{wch:38},{wch:14}];const tech=[['ID','Tecnicatura'],...Object.entries(CareerMapper).map(([id,c])=>[String(id),id==='7'?'Ciencia de datos e inteligencia artificial':c.label])];const wsTech=XLSX.utils.aoa_to_sheet(tech);wsTech['!cols']=[{wch:8},{wch:42}];const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Interesados');XLSX.utils.book_append_sheet(wb,wsTech,'Tecnicaturas');XLSX.writeFile(wb,`plantilla-interesados_${new Date().toISOString().slice(0,10)}.xlsx`);toast('Excel generado en formato CRM')}'''
+          pat=r"function exportExcel\(\)\{.*?toast\('Excel generado'\)\}"
+          s2,n=re.subn(pat,new,s,count=1,flags=re.S)
+          if n!=1:
+              raise SystemExit(f'No se encontró exportExcel: {n}')
+          p.write_text(s2,encoding='utf-8')
+          PY
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet && exit 0
+          git commit -m "Exporta Excel con estructura exacta de plantilla CRM"
+          git push
