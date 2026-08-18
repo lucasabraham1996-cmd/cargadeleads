@@ -502,6 +502,7 @@ function detectCareer(text) {
 
 function cleanupName(value) {
   let s = String(value || '').replace(/[\[\]_*•|]/g, ' ').replace(/\s+/g, ' ').trim();
+  s = s.replace(/^[~～˜]\s*/, '').trim();
   s = s.replace(/^[¡!¿?.,;:]+|[¡!¿?.,;:]+$/g, '').trim();
   s = s.replace(/\b(whatsapp|business|contacto|perfil|nombre|apellido|cliente|lead|prospecto)\b\s*:?/ig, '').trim();
   s = s.replace(/\s[-–—]\s.*$/, '').replace(/\([^)]*\)$/,'').trim();
@@ -524,6 +525,7 @@ function extractExplicitNameCandidates(text) {
     /(?:^|\n|[.!?])\s*(?:mi\s+)?nombre(?!\s+completo\b|\s+y\s+apellido\b)\s*(?:es\s*)?[:\-]?\s*([A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]{2,80}?)(?=\s*(?:\n|mi\s+consulta|consulta|carrera|inter[eé]s|tel[eé]fono|celular|correo|email|mail|asunto|[.!?]|$))/ig,
     /(?:^|\n|[.!?])\s*me\s+llamo\s*[:\-]?\s*([A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]{2,80}?)(?=\s*(?:\n|consulta|carrera|inter[eé]s|tel[eé]fono|celular|correo|email|mail|[.!?]|$))/ig,
     /(?:^|\n|[.!?])\s*soy\s+([A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]{2,60}?)(?=\s*(?:\n|consulta|carrera|inter[eé]s|tel[eé]fono|celular|correo|email|mail|[.!?]|$))/ig,
+    /(?:^|\n)\s*(?:hola[!,.;:\s-]*|buen(?:os|as)\s+d[ií]as[!,.;:\s-]*)?(?:soy|me\s+llamo)\s+([A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]{2,60}?)(?=\s+(?:y\s+(?:quiero|necesito|consulto|me\s+interesa)|consulta|carrera|inter[eé]s|tel[eé]fono|celular|correo|email|mail)\b|[.!?,]|$)/ig,
     /(?:nombre\s*del\s*(?:contacto|prospecto|lead|perfil)|perfil(?:\s*de\s*whatsapp)?|contacto(?:\s*de\s*whatsapp)?)\s*(?:es\s*)?[:\-]?\s*([^\n]{2,80})/ig,
     /(?:^|\n)\s*(?:de|from)\s*:\s*([^<\n]+)(?:<[^>]+>)?/ig
   ];
@@ -594,12 +596,19 @@ function detectName(text, email, source) {
     if (v) return { name: v, confidence: 'alta', reason: 'Nombre y apellido explícitos' };
   }
 
-  // 3) En WhatsApp, buscar primero el nombre visible del encabezado/perfil.
+  // 3) En WhatsApp, el nombre de perfil debajo del teléfono (~Erika) tiene prioridad sobre cualquier texto de interfaz.
   const lines = raw.split('\n').map(x => x.trim()).filter(Boolean);
   const bad = /^(hoy|ayer|en linea|en línea|últ|ult\.|mensaje|cifrado|escribiendo|buscar|info|informacion|información|consulta|hola|buenas|asunto|para:|de:|from:|to:|mi consulta es|cuenta de empresa|se unió|se unio|bloquear|tu empresa usa|haz clic|servicio seguro)/i;
 
   if (source === 'WhatsApp Comercial') {
-    // Primero buscamos una línea de nombre cercana a datos de perfil/chat.
+    for (const line of lines.slice(0, 20)) {
+      const profile = line.match(/^\s*[~～˜]\s*([A-Za-zÁÉÍÓÚÜÑáéíóúüñ][A-Za-zÁÉÍÓÚÜÑáéíóúüñ' .-]{0,59})\s*$/);
+      if (!profile) continue;
+      const v = cleanupName(profile[1]);
+      if (v) return { name: v, confidence: 'alta', reason: 'Nombre de perfil de WhatsApp (~)' };
+    }
+
+    // Si no apareció el ~, buscar una línea corta que parezca nombre visible del chat.
     for (const line of lines.slice(0, 14)) {
       if (bad.test(line) || line.includes('@') || /\d{5,}/.test(line) || line.length > 55) continue;
       const v = cleanupName(line);
