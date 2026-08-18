@@ -86,7 +86,44 @@ async function processImage(file){$('status').textContent='Procesando captura...
 function tab(x){$('auto').style.display=x==='auto'?'block':'none';$('manual').style.display=x==='manual'?'block':'none';$('tAuto').classList.toggle('active',x==='auto');$('tManual').classList.toggle('active',x==='manual')}
 function addManual(){let n=$('mname').value.trim(),p=$('mphone').value.replace(/\D/g,''),e=$('memail').value.trim();if(!n&&!p&&!e)return toast('Ingresá al menos un dato');addRow({id:Date.now()+Math.random(),nombre:title(n)||'SIN NOMBRE',telefono:p,email:e,provincia:$('mprov').value||province(p),tecnicaturaId:$('mcareer').value,fuente:$('msource').value,observaciones:$('mobs').value,meta:{name:'alta',career:'alta'}});['mname','mphone','memail','mprov','mobs'].forEach(x=>$(x).value='');toast('Lead agregado')}
 function copyOne(id){let r=rows.find(x=>String(x.id)===String(id));if(!r)return;navigator.clipboard?.writeText(`${r.nombre}\t${r.telefono}\t${r.email}\t${CareerMapper[r.tecnicaturaId]?.label||''}\t${r.fuente}`);toast('Lead copiado')}function copyAll(){if(!rows.length)return toast('No hay leads');navigator.clipboard?.writeText(rows.map(r=>`${r.nombre}\t${r.telefono}\t${r.email}\t${CareerMapper[r.tecnicaturaId]?.label||''}\t${r.fuente}`).join('\n'));toast('Todos los leads copiados')}
-function exportExcel(){if(!rows.length)return toast('No hay datos');let data=rows.map(r=>({'Nombre Completo':r.nombre,'Teléfono':r.telefono,'Email':r.email,'Tecnicatura ID':r.tecnicaturaId,'Carrera':CareerMapper[r.tecnicaturaId]?.label||'','Fuente':r.fuente,'Provincia':r.provincia,'Estado':'sin_contacto','Observaciones':r.observaciones,'Vendedor ID':''}));let ws=XLSX.utils.json_to_sheet(data),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Leads');XLSX.writeFile(wb,`Leads_CRM_${new Date().toISOString().slice(0,10)}.xlsx`);toast('Excel generado')}
+function exportExcel(){
+  if(!rows.length)return toast('No hay datos');
+  const invalidCareer=rows.filter(r=>!/^\d+$/.test(String(r.tecnicaturaId||''))||!CareerMapper[String(r.tecnicaturaId)]);
+  if(invalidCareer.length){
+    toast(`Hay ${invalidCareer.length} lead(s) sin carrera válida. Asignales una carrera antes de exportar.`);
+    return;
+  }
+  const invalidPhone=rows.filter(r=>r.telefono&&String(r.telefono).replace(/\D/g,'').length<10);
+  if(invalidPhone.length){
+    toast(`Hay ${invalidPhone.length} teléfono(s) incompletos. Revisalos antes de exportar.`);
+    return;
+  }
+  let data=rows.map(r=>({
+    'Nombre Completo':String(r.nombre||'').trim(),
+    'Teléfono':String(r.telefono||'').replace(/\D/g,''),
+    'Email':String(r.email||'').trim(),
+    'Tecnicatura ID':Number(r.tecnicaturaId),
+    'Carrera':CareerMapper[String(r.tecnicaturaId)]?.label||'',
+    'Fuente':String(r.fuente||'').trim(),
+    'Provincia':String(r.provincia||'').trim(),
+    'Estado':'sin_contacto',
+    'Observaciones':String(r.observaciones||'').trim()
+  }));
+  let ws=XLSX.utils.json_to_sheet(data,{cellDates:false});
+  const headers=Object.keys(data[0]);
+  const techCol=headers.indexOf('Tecnicatura ID');
+  if(techCol>=0){
+    for(let i=1;i<=data.length;i++){
+      const cell=XLSX.utils.encode_cell({r:i,c:techCol});
+      if(ws[cell]){ws[cell].t='n';ws[cell].v=Number(ws[cell].v);}
+    }
+  }
+  ws['!cols']=[{wch:28},{wch:18},{wch:30},{wch:15},{wch:30},{wch:22},{wch:24},{wch:18},{wch:42}];
+  let wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Leads');
+  XLSX.writeFile(wb,`Leads_CRM_${new Date().toISOString().slice(0,10)}.xlsx`);
+  toast(`Excel generado: ${data.length} lead(s) validados para CRM`)
+}
 $('paste').addEventListener('input',()=>{$('ph').style.opacity=$('paste').value.trim()?'0':'1'});$('paste').addEventListener('paste',e=>{let img=[...e.clipboardData.items].find(x=>x.type.startsWith('image/'));if(img){e.preventDefault();processImage(img.getAsFile());return}setTimeout(()=>{if($('paste').value.trim())analyzeText()},40)});$('file').addEventListener('change',e=>{if(e.target.files?.[0])processImage(e.target.files[0]);e.target.value=''});['dragenter','dragover'].forEach(ev=>$('drop').addEventListener(ev,e=>{e.preventDefault();$('drop').classList.add('drag')}));['dragleave','drop'].forEach(ev=>$('drop').addEventListener(ev,e=>{e.preventDefault();$('drop').classList.remove('drag')}));$('drop').addEventListener('drop',e=>{let f=[...e.dataTransfer.files].find(x=>x.type.startsWith('image/'));if(f)processImage(f)});
 $('mcareer').innerHTML='<option value="">Sin asignar</option>'+Object.entries(CareerMapper).map(([id,c])=>`<option value="${id}">${c.label} (${c.short})</option>`).join('');render();
 </script>
