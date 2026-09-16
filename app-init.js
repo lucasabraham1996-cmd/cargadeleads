@@ -1,3 +1,5 @@
+CareerMapper[9]={label:'Logística',short:'LOG',color:'#67246F',words:['logística','logistica','tecnicatura en logística','tecnicatura en logistica','gestión logística','gestion logistica','operaciones logísticas','operaciones logisticas','cadena de suministro','supply chain','transporte y distribución','transporte y distribucion'],codes:['log','logistica','log-s']};
+
 function exportExcel(){
   if(!rows.length)return toast('No hay datos');
   const invalidPhone=rows.filter(r=>r.telefono&&String(r.telefono).replace(/\D/g,'').length<10);
