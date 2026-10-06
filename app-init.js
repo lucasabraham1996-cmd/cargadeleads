@@ -1,4 +1,5 @@
-CareerMapper[9]={label:'Logística',short:'LOG',color:'#67246F',words:['logística','logistica','tecnicatura en logística','tecnicatura en logistica','gestión logística','gestion logistica','operaciones logísticas','operaciones logisticas','cadena de suministro','supply chain','transporte y distribución','transporte y distribucion'],codes:['log','logistica','log-s']};
+CareerMapper[9]={label:'CCAP',short:'CCAP',color:'#64748b',words:['ccap'],codes:['ccap']};
+CareerMapper[10]={label:'Logística',short:'LOG',color:'#67246F',words:['logística','logistica','tecnicatura en logística','tecnicatura en logistica','gestión logística','gestion logistica','operaciones logísticas','operaciones logisticas','cadena de suministro','supply chain','transporte y distribución','transporte y distribucion'],codes:['log','logistica','log-s']};
 
 function exportExcel(){
   if(!rows.length)return toast('No hay datos');
